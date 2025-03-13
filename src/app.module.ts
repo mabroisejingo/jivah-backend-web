@@ -8,6 +8,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { ProductsModule } from './products/products.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { FileUploadModule } from './file-upload/file-upload.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { FileUploadModule } from './file-upload/file-upload.module';
     ProductsModule,
     InventoryModule,
     FileUploadModule,
+    CartModule,
   ],
   controllers: [],
   providers: [PrismaService],

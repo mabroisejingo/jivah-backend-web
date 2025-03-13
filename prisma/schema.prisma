@@ -16,20 +16,18 @@ model User {
   phoneVerified Boolean    @default(false)
   phone         String?    @unique
   password      String?
-  role          Role       @relation(fields: [roleId], references: [id])
+  role          Role
   deleted       Boolean    @default(false)
   favorites     Favorite[]
   cartItems     CartItem[]
   reviews       Review[]
   orders        Order[]
-  roleId        String
 }
 
-model Role {
-  id         String      @id @default(cuid())
-  name       String      @unique
-  users      User[]
-  privileges Privilege[]
+enum Role {
+  ADMIN
+  USER
+  EMPLOYEE
 }
 
 enum Privilege {
@@ -47,7 +45,6 @@ model Product {
   images      ProductImage[]
   variants    ProductVariant[]
   reviews     Review[]
-  discounts   Discount[]
   categoryId  String?
   category    Category?        @relation(fields: [categoryId], references: [id])
   tags        String[]
@@ -81,17 +78,15 @@ model ProductVariant {
   size      String
   product   Product     @relation(fields: [productId], references: [id])
   Inventory Inventory[]
-  CartItem  CartItem[]
-  OrderItem OrderItem[]
 }
 
 model Discount {
-  id         String   @id @default(cuid())
-  productId  String
-  percentage Float    @default(0.0)
-  startDate  DateTime
-  endDate    DateTime
-  product    Product  @relation(fields: [productId], references: [id])
+  id          String    @id @default(cuid())
+  inventoryId String
+  percentage  Float     @default(0.0)
+  startDate   DateTime
+  endDate     DateTime
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
 }
 
 model Inventory {
@@ -100,7 +95,10 @@ model Inventory {
   quantity  Int            @default(0)
   price     Float
   updatedAt DateTime       @updatedAt
+  discounts Discount[]
   variant   ProductVariant @relation(fields: [variantId], references: [id])
+  CartItem  CartItem[]
+  OrderItem OrderItem[]
 }
 
 model Favorite {
@@ -112,12 +110,12 @@ model Favorite {
 }
 
 model CartItem {
-  id        String         @id @default(cuid())
-  userId    String
-  variantId String
-  quantity  Int            @default(1)
-  user      User           @relation(fields: [userId], references: [id])
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  id          String    @id @default(cuid())
+  userId      String
+  quantity    Int       @default(1)
+  user        User      @relation(fields: [userId], references: [id])
+  product     Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId String
 }
 
 model Order {
@@ -140,13 +138,13 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id        String         @id @default(cuid())
-  orderId   String
-  variantId String
-  quantity  Int
-  price     Float
-  order     Order          @relation(fields: [orderId], references: [id])
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  id          String    @id @default(cuid())
+  orderId     String
+  quantity    Int
+  price       Float
+  order       Order     @relation(fields: [orderId], references: [id])
+  product     Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId String
 }
 
 model Review {

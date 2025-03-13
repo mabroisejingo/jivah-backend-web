@@ -16,7 +16,7 @@ import { SocialLoginDto } from './dto/social-login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { VerifyDto } from './dto/verify.dto';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import { Request } from 'express';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh.dto';
@@ -27,14 +27,15 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly utils: UtilsService,
     private readonly config: ConfigService,
-  ) { }
+  ) {}
 
   async register(registerDto: RegisterDto, req: Request) {
     const { email, phone, password, name, username } = registerDto;
 
     if (!email && !phone) {
       throw new BadRequestException('Email or phone number must be provided');
-    } const existingUser = await this.prisma.user.findFirst({
+    }
+    const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [{ email }, { phone }, { username }],
       },
@@ -53,9 +54,6 @@ export class AuthService {
     }
 
     const hashedPassword = await this.utils.hashPassword(password);
-    const userRole = await this.prisma.role.findFirst({
-      where: { name: 'USER' },
-    });
 
     const user = await this.prisma.user.create({
       data: {
@@ -64,7 +62,7 @@ export class AuthService {
         email,
         phone,
         password: hashedPassword,
-        roleId: userRole.id,
+        role: Role.USER,
       },
     });
 
@@ -156,7 +154,7 @@ export class AuthService {
       throw new UnauthorizedException('Unauthorized');
     }
 
-    const decoded = await this.utils.verifyToken(refreshToken) as any;
+    const decoded = (await this.utils.verifyToken(refreshToken)) as any;
     const user = await this.prisma.user.findUnique({
       where: { id: decoded.id },
     });
@@ -179,9 +177,6 @@ export class AuthService {
       },
     };
   }
-
-
-
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -236,9 +231,6 @@ export class AuthService {
           OR: [{ email: userInfo.email }, { phone: userInfo.phone }],
         },
       });
-      const userRole = await this.prisma.role.findFirst({
-        where: { name: 'USER' },
-      });
 
       if (!user) {
         user = await this.prisma.user.create({
@@ -247,7 +239,7 @@ export class AuthService {
             phone: userInfo.phone,
             name: userInfo.name,
             username: userInfo.username,
-            roleId: userRole.id,
+            role: Role.USER,
           },
         });
       }
@@ -364,7 +356,6 @@ export class AuthService {
   //     );
   //   }
   // }
-
 
   async changePassword(changePasswordDto: ChangePasswordDto, user: User) {
     const { newPassword, oldPassword } = changePasswordDto;

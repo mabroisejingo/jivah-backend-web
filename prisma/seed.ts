@@ -6,11 +6,11 @@ const prisma = new PrismaClient();
 
 async function main() {
     try {
-        await seedRoles(prisma);
-        console.log("Roles seeded successfully.");
+        // await seedRoles(prisma);
+        // console.log("Roles seeded successfully.");
 
-        await seedAdminUser(prisma);
-        console.log("Admin user seeded successfully.");
+        // await seedAdminUser(prisma);
+        // console.log("Admin user seeded successfully.");
     } catch (error) {
         console.error("Error while seeding: ", error);
         process.exit(1);

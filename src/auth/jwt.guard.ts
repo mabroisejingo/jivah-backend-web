@@ -37,7 +37,6 @@ export class JwtGuard implements CanActivate {
       const decoded = (await this.utils.verifyToken(token)) as any;
       const user = await this.prisma.user.findUnique({
         where: { id: decoded.id },
-        include: { role: true },
       });
       if (!user) {
         throw new UnauthorizedException('Unauthorized.');
