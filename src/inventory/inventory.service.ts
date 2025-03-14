@@ -88,7 +88,7 @@ export class InventoryService {
 
     const total = await this.prisma.inventory.count({ where });
 
-    return { inventories, total };
+    return { items:inventories, total };
   }
 
   async findOne(id: string) {

@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -14,6 +16,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { JwtGuard } from 'src/auth/jwt.guard';
+import { Request } from 'express';
 
 @Controller('products')
 @ApiTags('Products')
@@ -55,6 +59,42 @@ export class ProductsController {
         sizes: sizes ? sizes.split(',') : undefined,
         search,
       },
+    });
+  }
+
+  @Get('products')
+  findAllProducts(@Query() query: any) {
+    const { page, limit, category, tags, colors, sizes, search } = query;
+
+    return this.productsService.findAllProducts({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 10,
+      filters: {
+        category,
+        tags: tags ? tags.split(',') : undefined,
+        colors: colors ? colors.split(',') : undefined,
+        sizes: sizes ? sizes.split(',') : undefined,
+        search,
+      },
+    });
+  }
+
+  @Get('favorites')
+  @UseGuards(JwtGuard)
+  @ApiOperation({ summary: 'Get favorite products for the logged-in user' })
+  @ApiResponse({ status: 200, description: 'Returns the favorite products' })
+  async getFavoriteProducts(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('orderBy') orderBy: string,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc',
+    @Req() req: Request,
+  ) {
+    return this.productsService.getFavoriteProducts(req.user.id, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      orderBy,
+      sortOrder,
     });
   }
 

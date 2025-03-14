@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -141,6 +147,138 @@ export class ProductsService {
     );
     return {
       items: products,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findAllProducts(params: {
+    page?: number;
+    limit?: number;
+    filters?: {
+      category?: string;
+      tags?: string[];
+      colors?: string[];
+      sizes?: string[];
+      search?: string;
+    };
+  }) {
+    const { page = 1, limit = 10, filters } = params;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (filters) {
+      if (filters.category) where.category = { name: filters.category };
+      if (filters.tags) where.tags = { hasSome: filters.tags };
+      if (filters.search)
+        where.name = { contains: filters.search, mode: 'insensitive' };
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        category: true,
+        variants: true,
+        reviews: true,
+        Favorite: true,
+        images: true,
+      },
+    });
+
+    const total = await this.prisma.product.count({ where });
+
+    const formattedProducts = products.map((product) => ({
+      name: product.name,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      image: product.images.length > 0 ? product.images[0].url : null,
+      variants: product.variants.map(({ color, size, id }) => ({
+        color,
+        size,
+        variantId: id,
+      })),
+      reviewsCount: product.reviews.length,
+      isFavorite: product.Favorite.length > 0,
+      productId: product.id,
+    }));
+
+    return {
+      items: formattedProducts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getFavoriteProducts(
+    userId: string,
+    params: {
+      page?: number;
+      limit?: number;
+      orderBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+  ) {
+    const { page = 1, limit = 10, orderBy, sortOrder } = params;
+    const skip = (page - 1) * limit;
+
+    let orderByClause: any = {};
+    if (orderBy) {
+      orderByClause = { [orderBy]: sortOrder || 'asc' };
+    } else {
+      // Default ordering
+      orderByClause = { createdAt: 'desc' };
+    }
+
+    const favorites = await this.prisma.favorite.findMany({
+      where: { userId },
+      skip,
+      take: limit,
+      orderBy: orderByClause,
+      include: {
+        product: {
+          include: {
+            category: true,
+            variants: {
+              include: {
+                Inventory: true,
+              },
+            },
+            images: true,
+            reviews: true,
+          },
+        },
+      },
+    });
+
+    const total = await this.prisma.favorite.count({ where: { userId } });
+
+    const formattedProducts = favorites.map(({ product }) => ({
+      productId: product.id,
+      name: product.name,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      image: product.images.length > 0 ? product.images[0].url : null,
+      variants: product.variants.map(({ color, size, id, Inventory }) => ({
+        color,
+        size,
+        variantId: id,
+        price: Inventory[0].price,
+        quantity: Inventory[0].quantity,
+      })),
+      reviewsCount: product.reviews.length,
+      isFavorite: true,
+    }));
+
+    return {
+      items: formattedProducts,
       total,
       page,
       limit,
@@ -340,6 +478,19 @@ export class ProductsService {
   }
 
   async createCategory(createCategoryDto: CreateCategoryDto) {
+    const existingCategory = await this.prisma.category.findUnique({
+      where: {
+        name: createCategoryDto.name,
+      },
+    });
+
+    if (existingCategory) {
+      throw new HttpException(
+        'Category already exists',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     return this.prisma.category.create({
       data: createCategoryDto,
     });
@@ -394,9 +545,7 @@ export class ProductsService {
       existingCategory.children.length > 0 ||
       existingCategory.products.length > 0
     ) {
-      throw new Error(
-        'Cannot delete a category with subcategories or products',
-      );
+      throw new BadRequestException('Cannot delete a category with  products');
     }
 
     return this.prisma.category.delete({
