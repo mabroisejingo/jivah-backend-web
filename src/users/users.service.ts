@@ -6,16 +6,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
-import { UtilsService } from 'src/utils/utils.service';
+import { UtilsService } from '../utils/utils.service';
+import { Prisma, Role, User } from '@prisma/client';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
 
 @Injectable()
 export class UsersService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly utils: UtilsService,
+    private prisma: PrismaService,
+    private utils: UtilsService,
   ) {}
 
   async update(id: string, updateUserDto: UpdateUserDto) {
@@ -33,8 +35,84 @@ export class UsersService {
     });
   }
 
-  async findAll() {
-    return this.prisma.user.findMany();
+  async findAll(params: {
+    skip?: number;
+    take?: number;
+    search?: string;
+  }): Promise<{ users: User[]; total: number }> {
+    const { skip, take, search } = params;
+
+    const where: Prisma.UserWhereInput = {
+      role: Role.USER,
+      deleted: false,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { users, total };
+  }
+
+  async createEmployee(createEmployeeDto: CreateEmployeeDto): Promise<User> {
+    const { email, name, username, phone } = createEmployeeDto;
+
+    // Check if a user with the same username, email, or phone exists
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { username }, { phone }],
+      },
+    });
+
+    if (existingUser) {
+      throw new Error(
+        'User with the same email, username, or phone already exists',
+      );
+    }
+
+    // Create the employee
+    const employee = await this.prisma.user.create({
+      data: {
+        email,
+        name,
+        username,
+        phone,
+        role: Role.EMPLOYEE,
+      },
+    });
+
+    // Create a token for password setup
+    const token = await this.utils.createToken(
+      { id: employee.id.toString(), email: employee.email },
+      { expiresIn: '7d' },
+    );
+
+    // Store the token in the database
+    await this.prisma.token.create({
+      data: {
+        token,
+        userId: employee.id,
+        type: 'PASSWORD_SET',
+      },
+    });
+
+    // Send account setup email with the token
+    await this.utils.sendEmployeeAccountSetupEmails(name, token, email);
+
+    return employee;
   }
 
   async findOne(id: string) {
@@ -75,6 +153,7 @@ export class UsersService {
         email: true,
         username: true,
         phone: true,
+        role: true,
       },
     });
     if (!user) {
@@ -206,5 +285,20 @@ export class UsersService {
       });
       return { message: 'Product added to favorites' };
     }
+  }
+
+  async findAllEmployees(): Promise<User[]> {
+    const [employees, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          role: Role.EMPLOYEE,
+          deleted: false,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count(),
+    ]);
+
+    return employees;
   }
 }

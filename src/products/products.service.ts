@@ -165,6 +165,7 @@ export class ProductsService {
       search?: string;
     };
   }) {
+    console.log(params.filters);
     const { page = 1, limit = 10, filters } = params;
     const skip = (page - 1) * limit;
     const where: any = {};

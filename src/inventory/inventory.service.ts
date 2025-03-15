@@ -88,7 +88,7 @@ export class InventoryService {
 
     const total = await this.prisma.inventory.count({ where });
 
-    return { items:inventories, total };
+    return { items: inventories, total };
   }
 
   async findOne(id: string) {
@@ -159,9 +159,27 @@ export class InventoryService {
   }
 
   async create(createInventoryDto: CreateInventoryDto) {
-    return this.prisma.inventory.create({
-      data: createInventoryDto,
+    const { variantId, quantity, price } = createInventoryDto;
+    const existingInventory = await this.prisma.inventory.findFirst({
+      where: {
+        variantId,
+        price,
+      },
     });
+
+    if (existingInventory) {
+      return this.prisma.inventory.update({
+        where: { id: existingInventory.id },
+        data: {
+          quantity: existingInventory.quantity + quantity,
+        },
+      });
+    } else {
+
+      return this.prisma.inventory.create({
+        data: createInventoryDto,
+      });
+    }
   }
 
   async update(id: string, updateInventoryDto: UpdateInventoryDto) {

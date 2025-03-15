@@ -24,6 +24,7 @@ model User {
   orders        Order[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  Token         Token[]
 }
 
 enum Role {
@@ -168,4 +169,19 @@ model Review {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Token {
+  id        String   @id @default(cuid())
+  token     String
+  type      TokeType
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TokeType {
+  PASSWORD_SET
+  PASSWORD_RESET
 }

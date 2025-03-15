@@ -4,6 +4,6 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class ForgotPasswordDto {
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ description: 'Email  or phone' })
-  identifier: string;
+  @ApiProperty({ description: 'Email' })
+  email: string;
 }

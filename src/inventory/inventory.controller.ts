@@ -7,11 +7,16 @@ import {
   Delete,
   Get,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { JwtGuard } from 'src/auth/jwt.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Role } from '@prisma/client';
+import { Roles } from 'src/auth/roles.decorator';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -91,11 +96,15 @@ export class InventoryController {
   }
 
   @Post()
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   create(@Body() createInventoryDto: CreateInventoryDto) {
     return this.inventoryService.create(createInventoryDto);
   }
 
   @Patch(':id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   update(
     @Param('id') id: string,
     @Body() updateInventoryDto: UpdateInventoryDto,
@@ -104,6 +113,8 @@ export class InventoryController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   remove(@Param('id') id: string) {
     return this.inventoryService.remove(id);
   }

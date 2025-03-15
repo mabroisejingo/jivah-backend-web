@@ -18,7 +18,7 @@ import { LogoutDto } from './dto/logout.dto';
 import { VerifyDto } from './dto/verify.dto';
 import { Role, User } from '@prisma/client';
 import { Request } from 'express';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import { RefreshTokenDto } from './dto/refresh.dto';
 
 @Injectable()
@@ -140,6 +140,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           username: user.username,
+          role: user.role,
         },
         accessToken,
         refreshToken,
@@ -274,88 +275,67 @@ export class AuthService {
     }
   }
 
-  // async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-  //   const { identifier } = forgotPasswordDto;
+  async setPassword(token: string, newPassword: string): Promise<User> {
+    const decodedToken: any = await this.utils.verifyToken(token);
 
-  //   if (!identifier) {
-  //     throw new BadRequestException(
-  //       'Identifier (email or phone number) must be provided',
-  //     );
-  //   }
+    if (!decodedToken || !decodedToken.id) {
+      throw new Error('Invalid or expired token');
+    }
 
-  //   try {
-  //     const user = await this.prisma.user.findFirst({
-  //       where: {
-  //         OR: [
-  //           { email: identifier, deleted: false },
-  //           { phone: identifier, deleted: false },
-  //         ],
-  //       },
-  //     });
+    const user = await this.prisma.user.findUnique({
+      where: { id: decodedToken.id },
+    });
 
-  //     if (!user) {
-  //       throw new NotFoundException('User not found');
-  //     }
-  //     const token = this.utils.createToken({ identifier }, { expiresIn: "1h" });
-  //     if (user.phone === identifier) {
-  //       await this.utils.sendOtpToPhone(identifier, token, 'password-reset');
-  //     }
-  //     if (user.email === identifier) {
-  //       await this.utils.sendOtpToEmail(user, token, 'password-reset');
-  //     }
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
 
-  //     await this.prisma.otpToken.create({
-  //       data: {
-  //         user: { connect: { id: user.id } },
-  //         type: 'password-reset',
-  //         otp,
-  //         expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-  //       },
-  //     });
+    const existingToken = await this.prisma.token.findFirst({
+      where: {
+        userId: user.id,
+        token,
+        type: 'PASSWORD_SET',
+      },
+    });
 
-  //     return { message: 'Password reset otp sent to your email or phone' };
-  //   } catch (error) {
-  //     throw new BadRequestException(
-  //       'An error occurred while sending the reset link. Please try again later',
-  //     );
-  //   }
-  // }
-  // async resetPassword(data: ResetPasswordDto) {
-  //   const { newPassword, resetToken } = data;
-  //   try {
-  //     const token = await this.prisma.otpToken.findFirst({
-  //       where: {
-  //         token: resetToken,
-  //         type: 'password-reset',
-  //         used: false,
-  //       },
-  //     });
-  //     if (!token) {
-  //       throw new BadRequestException('Invalid Token Provided');
-  //     }
-  //     const currentTime = new Date();
-  //     const otpExpiresAt = new Date(token.expiresAt);
-  //     const timeDifference = (otpExpiresAt.getTime() - currentTime.getTime()) / 1000 / 60;
+    if (!existingToken) {
+      throw new BadRequestException('Invalid or expired token');
+    }
 
-  //     if (timeDifference < 60) {
-  //       throw new BadRequestException('OTP has expired. Please request a new one');
-  //     }
-  //     const hashedPassword = await this.utils.hashPassword(newPassword);
-  //     await this.prisma.user.update({
-  //       where: { id: token.userId },
-  //       data: { password: hashedPassword },
-  //     });
+    const hashedPassword = await this.utils.hashPassword(newPassword);
 
-  //     return {
-  //       message: 'Password successfully updated.',
-  //     };
-  //   } catch (error) {
-  //     console.error('Error during password reset:', error);
-  //     throw new UnauthorizedException(
-  //       'An error occurred while updating your password. Please try again later',
-  //     );
-  //   }
-  // }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    await this.prisma.token.deleteMany({
+      where: { userId: user.id, type: 'PASSWORD_SET' },
+    });
+
+    return user;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (!user) {
+      throw new BadRequestException('User with this email does not exist');
+    }
+    const token = await this.utils.createToken(
+      { id: user.id.toString(), email: user.email },
+      { expiresIn: '1h' },
+    );
+    await this.prisma.token.create({
+      data: {
+        token,
+        userId: user.id,
+        type: 'PASSWORD_SET',
+      },
+    });
+    await this.utils.sendPasswordResetEmail(token, user.email);
+  }
 
   async changePassword(changePasswordDto: ChangePasswordDto, user: User) {
     const { newPassword, oldPassword } = changePasswordDto;

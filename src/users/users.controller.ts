@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   Post,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -21,17 +22,29 @@ import { JwtGuard } from 'src/auth/jwt.guard';
 import { Request } from 'express';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { Roles } from 'src/auth/roles.decorator';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Role } from '@prisma/client';
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, RolesGuard)
 @ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(
+    @Query('skip') skip: number = 0,
+    @Query('take') take: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    return this.usersService.findAll({
+      skip,
+      take,
+      search,
+    });
   }
 
   @Get(':id/id')
@@ -105,5 +118,17 @@ export class UsersController {
   async toggleFavorite(@Req() req, @Body('productId') productId: string) {
     const userId = req.user.id;
     return this.usersService.toggleFavorite(userId, productId);
+  }
+
+  @Post('employees')
+  @Roles(Role.ADMIN)
+  async createEmployee(@Body() createEmployeeDto: CreateEmployeeDto) {
+    return this.usersService.createEmployee(createEmployeeDto);
+  }
+
+  @Get('employees')
+  @Roles(Role.ADMIN)
+  async findAllEmployees() {
+    return this.usersService.findAllEmployees();
   }
 }

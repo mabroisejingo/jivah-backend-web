@@ -15,6 +15,8 @@ import * as nodemailer from 'nodemailer';
 import { User } from '@prisma/client';
 import {
   activateAccountTemplate,
+  employeeSetPasswordEmailTemplate,
+  employeeWelcomeEmailTemplate,
   newDeviceLoginTemplate,
   welcomeEmailTemplate,
 } from 'src/templates/authentication.template';
@@ -167,26 +169,41 @@ export class UtilsService {
   async sendOtpToEmail(
     user: User,
     otp: string,
-    type: 'password-reset' | 'verification',
+    type: 'password-set' | 'verification',
   ) {
     const emailHtml = activateAccountTemplate(otp, type);
     const subject =
-      type == 'password-reset'
-        ? 'Reset Password'
-        : 'Activate Your jivah Account';
+      type == 'password-set' ? 'Reset Password' : 'Activate Your jivah Account';
     await this.sendEmail(user.email, emailHtml, subject);
+  }
+
+  async sendEmployeeAccountSetupEmails(
+    name: string,
+    token: string,
+    email: string,
+  ) {
+    const emailHtml = employeeWelcomeEmailTemplate(name);
+    const subject = 'Welcome to Jivah';
+    await this.sendEmail(email, emailHtml, subject);
+    const emailHtml2 = employeeSetPasswordEmailTemplate(token);
+    const subject2 = 'To start using Jivah set your password';
+    await this.sendEmail(email, emailHtml2, subject2);
+  }
+
+  async sendPasswordResetEmail(token: string, email: string) {
+    const html = employeeSetPasswordEmailTemplate(token);
+    const subject = 'Reset Password';
+    await this.sendEmail(email, html, subject);
   }
 
   async sendTokenToEmail(
     user: User,
     otp: string,
-    type: 'password-reset' | 'verification',
+    type: 'password-set' | 'verification',
   ) {
     const emailHtml = activateAccountTemplate(otp, type);
     const subject =
-      type == 'password-reset'
-        ? 'Reset Password'
-        : 'Activate Your jivah Account';
+      type == 'password-set' ? 'Reset Password' : 'Activate Your jivah Account';
     await this.sendEmail(user.email, emailHtml, subject);
   }
 
@@ -214,7 +231,7 @@ export class UtilsService {
     type,
   }: {
     user: User;
-    type: 'password-reset' | 'verification';
+    type: 'password-set' | 'verification';
   }) {
     const link = this.config.get<string>('FRONTEND_URL') + '/auth/activate';
     const emailHtml = activateAccountTemplate(link, type);

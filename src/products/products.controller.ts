@@ -18,6 +18,9 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { JwtGuard } from 'src/auth/jwt.guard';
 import { Request } from 'express';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/roles.decorator';
+import { Role } from '@prisma/client';
 
 @Controller('products')
 @ApiTags('Products')
@@ -63,6 +66,8 @@ export class ProductsController {
   }
 
   @Get('products')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   findAllProducts(@Query() query: any) {
     const { page, limit, category, tags, colors, sizes, search } = query;
 
@@ -126,16 +131,22 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
   @Patch(':id/id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.update(id, updateProductDto);
   }
 
   @Delete(':id/id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
 
   @Post('categories')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({
     status: 201,
@@ -161,6 +172,8 @@ export class ProductsController {
   }
 
   @Patch('categories/:id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({
     status: 200,
@@ -175,6 +188,8 @@ export class ProductsController {
   }
 
   @Delete('categories/:id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
   @ApiOperation({ summary: 'Delete a category' })
   @ApiResponse({
     status: 200,

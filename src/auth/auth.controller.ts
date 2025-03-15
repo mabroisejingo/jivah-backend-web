@@ -1,14 +1,27 @@
-import { Controller, Post, Body, Req, UseGuards, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Get,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtGuard } from './jwt.guard';
 import { Request } from 'express';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { VerifyDto } from './dto/verify.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -17,7 +30,7 @@ import { RefreshTokenDto } from './dto/refresh.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -64,6 +77,15 @@ export class AuthController {
     return this.authService.changePassword(changePasswordDto, req.user);
   }
 
+  @Post('set-password')
+  async setPassword(@Body() setPasswordDto: SetPasswordDto) {
+    try {
+      const { resetToken, newPassword } = setPasswordDto;
+      return await this.authService.setPassword(resetToken, newPassword);
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
 
   @Get('me')
   @ApiBearerAuth()
@@ -73,5 +95,19 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@Req() req: Request) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    try {
+      const { email } = forgotPasswordDto;
+      await this.authService.forgotPassword(email);
+      return {
+        message:
+          'Password reset link has been sent to your email,and will be valid for an hour',
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }
