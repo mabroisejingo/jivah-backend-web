@@ -199,4 +199,9 @@ export class ProductsController {
   removeCategory(@Param('id') id: string) {
     return this.productsService.removeCategory(id);
   }
+
+  @Get('filters')
+  async getFilterOptions() {
+    return this.productsService.getFilterOptions();
+  }
 }

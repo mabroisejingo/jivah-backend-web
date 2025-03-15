@@ -57,6 +57,7 @@ export class ProductsService {
       search?: string;
     };
   }) {
+    console.log(params);
     const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
     const skip = (page - 1) * limit;
     const where: any = {};
@@ -552,5 +553,28 @@ export class ProductsService {
     return this.prisma.category.delete({
       where: { id },
     });
+  }
+
+  async getFilterOptions() {
+    const sizes = await this.prisma.productVariant.findMany({
+      select: { size: true },
+      distinct: ['size'],
+    });
+    const colors = await this.prisma.productVariant.findMany({
+      select: { color: true },
+      distinct: ['color'],
+    });
+    const categories = await this.prisma.category.findMany({
+      select: { id: true, name: true },
+    });
+    const tags = await this.prisma.product.findMany({
+      select: { tags: true },
+    });
+    return {
+      sizes: sizes.map((s) => s.size).filter(Boolean),
+      colors: colors.map((c) => c.color).filter(Boolean),
+      categories: categories.map((c) => c.name).filter(Boolean),
+      tags: [...new Set(tags.flatMap((p) => p.tags))],
+    };
   }
 }
