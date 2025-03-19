@@ -32,37 +32,38 @@ export class ProductsController {
     return this.productsService.create(createProductDto);
   }
   @Get()
-  async findAll(@Query() query: any, @Req() req: any) {
-    const {
-      page,
-      limit,
-      orderBy,
-      sortOrder,
-      minPrice,
-      maxPrice,
-      category,
-      tags,
-      colors,
-      sizes,
-      search,
-    } = query;
-
-    return this.productsService.findAll({
-      page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 10,
-      orderBy,
-      sortOrder,
-      filters: {
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        category,
-        tags: tags ? tags.split(',') : undefined,
-        colors: colors ? colors.split(',') : undefined,
-        sizes: sizes ? sizes.split(',') : undefined,
-        search,
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('orderBy') orderBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('category') category?: string,
+    @Query('tags') tags?: string,
+    @Query('colors') colors?: string,
+    @Query('sizes') sizes?: string,
+    @Query('search') search?: string,
+    @Req() req?: Request,
+  ) {
+    return this.productsService.findAll(
+      {
+        page: page ? parseInt(page) : 1,
+        limit: limit ? parseInt(limit) : 10,
+        orderBy,
+        sortOrder: sortOrder as any,
+        filters: {
+          minPrice: minPrice ? parseFloat(minPrice) : undefined,
+          maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+          category,
+          tags: tags ? tags.split(',') : undefined,
+          colors: colors ? colors.split(',') : undefined,
+          sizes: sizes ? sizes.split(',') : undefined,
+          search,
+        },
       },
-      req, // Pass the extracted userId
-    });
+      req,
+    );
   }
 
   @Get('products')

@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtGuard } from 'src/auth/jwt.guard';
 import { Request } from 'express';
@@ -9,8 +17,19 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  getAllNotifications(@Req() req: Request) {
-    return this.notificationsService.getAllNotifications(req.user.id);
+  getAllNotifications(
+    @Req() req: Request,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    const userId = req.user.id;
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+    return this.notificationsService.getAllNotifications(
+      userId,
+      pageNumber,
+      limitNumber,
+    );
   }
 
   @Patch(':id/read')

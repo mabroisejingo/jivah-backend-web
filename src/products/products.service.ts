@@ -47,26 +47,34 @@ export class ProductsService {
     });
   }
 
-  async findAll(params: {
-    page?: number;
-    limit?: number;
-    orderBy?: 'most_popular' | 'least_popular' | 'latest' | 'trending' | string;
-    sortOrder?: 'asc' | 'desc';
-    filters?: {
-      minPrice?: number;
-      maxPrice?: number;
-      category?: string;
-      tags?: string[];
-      colors?: string[];
-      sizes?: string[];
-      search?: string;
-    };
-    req: any;
-  }) {
+  async findAll(
+    params: {
+      page?: number;
+      limit?: number;
+      orderBy?:
+        | 'most_popular'
+        | 'least_popular'
+        | 'latest'
+        | 'trending'
+        | string;
+      sortOrder?: 'asc' | 'desc';
+      filters?: {
+        minPrice?: number;
+        maxPrice?: number;
+        category?: string;
+        tags?: string[];
+        colors?: string[];
+        sizes?: string[];
+        search?: string;
+      };
+    },
+    req: any,
+  ) {
+    console.log(params);
     let userId: string | null = null;
 
     try {
-      const authorization = params.req.headers.authorization || '';
+      const authorization = req.headers.authorization || '';
       const token = authorization.split(' ')[1];
       if (token) {
         const decoded = (await this.utils.verifyToken(token)) as any;
@@ -95,6 +103,19 @@ export class ProductsService {
       }
       if (filters.colors) where.variant = { color: { in: filters.colors } };
       if (filters.sizes) where.variant = { size: { in: filters.sizes } };
+      if (filters.category) {
+        where.variant = { product: { category: { name: filters.category } } };
+      }
+      if (filters.search) {
+        where.variant = {
+          product: {
+            OR: [
+              { name: { contains: filters.search, mode: 'insensitive' } },
+              { tags: { hasSome: [filters.search] } },
+            ],
+          },
+        };
+      }
     }
 
     let orderByClause: any = {};
@@ -192,7 +213,6 @@ export class ProductsService {
       search?: string;
     };
   }) {
-    console.log(params.filters);
     const { page = 1, limit = 10, filters } = params;
     const skip = (page - 1) * limit;
     const where: any = {};
