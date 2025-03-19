@@ -8,23 +8,24 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String
-  username      String?    @unique
-  email         String?    @unique
-  emailVerified Boolean    @default(false)
-  phoneVerified Boolean    @default(false)
-  phone         String?    @unique
+  username      String?        @unique
+  email         String?        @unique
+  emailVerified Boolean        @default(false)
+  phoneVerified Boolean        @default(false)
+  phone         String?        @unique
   password      String?
   role          Role
-  deleted       Boolean    @default(false)
+  deleted       Boolean        @default(false)
   favorites     Favorite[]
   cartItems     CartItem[]
   reviews       Review[]
   orders        Order[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   Token         Token[]
+  Notification  Notification[]
 }
 
 enum Role {
@@ -184,4 +185,23 @@ model Token {
 enum TokeType {
   PASSWORD_SET
   PASSWORD_RESET
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  type      NotificationType
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id])
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
 }

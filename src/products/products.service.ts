@@ -10,13 +10,18 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { UtilsService } from 'src/utils/utils.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private utils: UtilsService,
+  ) {}
 
   async create(createProductDto: CreateProductDto) {
     const { variants, images, ...productData } = createProductDto;
+    console.log(createProductDto);
 
     return this.prisma.product.create({
       data: {
@@ -56,8 +61,27 @@ export class ProductsService {
       sizes?: string[];
       search?: string;
     };
+    req: any;
   }) {
-    console.log(params);
+    let userId: string | null = null;
+
+    try {
+      const authorization = params.req.headers.authorization || '';
+      const token = authorization.split(' ')[1];
+      if (token) {
+        const decoded = (await this.utils.verifyToken(token)) as any;
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.id },
+        });
+        if (user) {
+          userId = user.id;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        'Token verification failed or user not found. Continuing without user ID.',
+      );
+    }
     const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
     const skip = (page - 1) * limit;
     const where: any = {};
@@ -112,7 +136,7 @@ export class ProductsService {
                 category: true,
                 variants: true,
                 reviews: true,
-                Favorite: true,
+                Favorite: userId ? { where: { userId } } : false,
                 images: true,
               },
             },
@@ -143,6 +167,8 @@ export class ProductsService {
         tags: variant.product.tags,
         color: variant.color,
         size: variant.size,
+        isFavorited:
+          variant.product.Favorite && variant.product.Favorite.length > 0,
         productId: variant.productId,
       }),
     );

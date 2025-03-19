@@ -31,9 +31,8 @@ export class ProductsController {
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
   }
-
   @Get()
-  findAll(@Query() query: any) {
+  async findAll(@Query() query: any, @Req() req: any) {
     const {
       page,
       limit,
@@ -62,6 +61,7 @@ export class ProductsController {
         sizes: sizes ? sizes.split(',') : undefined,
         search,
       },
+      req, // Pass the extracted userId
     });
   }
 
