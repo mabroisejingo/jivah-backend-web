@@ -1,11 +1,9 @@
 import {
   IsNotEmpty,
-  IsNumber,
   IsString,
   IsArray,
   IsOptional,
   ValidateNested,
-  Min,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -50,12 +48,6 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductImageDto)
   images: ProductImageDto[];
-
-  @ApiProperty({ type: [ProductVariantDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ProductVariantDto)
-  variants: ProductVariantDto[];
 
   @ApiProperty()
   @IsOptional()

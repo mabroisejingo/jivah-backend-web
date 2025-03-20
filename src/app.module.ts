@@ -10,6 +10,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { FileUploadModule } from './file-upload/file-upload.module';
 import { CartModule } from './cart/cart.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SalesModule } from './sales/sales.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     InventoryModule,
     FileUploadModule,
     CartModule,
+    SalesModule,
     NotificationsModule,
   ],
   controllers: [],

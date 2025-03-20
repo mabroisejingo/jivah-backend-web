@@ -21,11 +21,11 @@ model User {
   favorites     Favorite[]
   cartItems     CartItem[]
   reviews       Review[]
-  orders        Order[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   Token         Token[]
   Notification  Notification[]
+  Sale          Sale[]
 }
 
 enum Role {
@@ -107,8 +107,9 @@ model Inventory {
   discounts Discount[]
   variant   ProductVariant @relation(fields: [variantId], references: [id])
   CartItem  CartItem[]
-  OrderItem OrderItem[]
   createdAt DateTime       @default(now())
+  deleted   Boolean        @default(false)
+  Sale      Sale[]
 }
 
 model Favorite {
@@ -130,35 +131,6 @@ model CartItem {
   inventoryId String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-}
-
-model Order {
-  id        String      @id @default(cuid())
-  userId    String
-  status    OrderStatus @default(PENDING)
-  total     Float
-  user      User        @relation(fields: [userId], references: [id])
-  items     OrderItem[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-}
-
-enum OrderStatus {
-  PENDING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-  REFUNDED
-}
-
-model OrderItem {
-  id          String    @id @default(cuid())
-  orderId     String
-  quantity    Int
-  price       Float
-  order       Order     @relation(fields: [orderId], references: [id])
-  product     Inventory @relation(fields: [inventoryId], references: [id])
-  inventoryId String
 }
 
 model Review {
@@ -204,4 +176,27 @@ enum NotificationType {
   WARNING
   SUCCESS
   ERROR
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  userId        String?
+  client        String?
+  status        SaleStatus
+  paymentMethod String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  user          User?      @relation(fields: [userId], references: [id])
+  inventoryId   String
+  inventory     Inventory  @relation(fields: [inventoryId], references: [id])
+  quantity      Int
+  amount        Float
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  DELIVERING
+  CANCELLED
+  REFUNDED
 }

@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +12,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UtilsService } from 'src/utils/utils.service';
+import { UpdateVariantDto } from './dto/update-variant.dto';
+import { CreateVariantDto } from './dto/create-variant.dto';
 
 @Injectable()
 export class ProductsService {
@@ -20,18 +23,11 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto) {
-    const { variants, images, ...productData } = createProductDto;
-    console.log(createProductDto);
+    const { images, ...productData } = createProductDto;
 
     return this.prisma.product.create({
       data: {
         ...productData,
-        variants: {
-          create: variants.map((variant) => ({
-            color: variant.color,
-            size: variant.size,
-          })),
-        },
         images: {
           create: images,
         },
@@ -45,6 +41,80 @@ export class ProductsService {
         images: true,
       },
     });
+  }
+
+  async addVariant(productId: string, variantData: CreateVariantDto) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { images: true },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${productId} not found`);
+    }
+
+    const newVariant = await this.prisma.productVariant.create({
+      data: {
+        size: variantData.size,
+        color: variantData.color,
+        productId,
+      },
+      include: {
+        Inventory: true,
+      },
+    });
+
+    await this.prisma.productImage.create({
+      data: {
+        url: variantData.image,
+        color: variantData.color,
+        productId,
+      },
+    });
+
+    return newVariant;
+  }
+
+  async removeVariant(variantId: string) {
+    const variant = await this.prisma.productVariant.findUnique({
+      where: { id: variantId },
+    });
+    if (!variant) {
+      throw new NotFoundException(`Variant with ID ${variantId} not found`);
+    }
+
+    return this.prisma.productVariant.delete({
+      where: { id: variantId },
+    });
+  }
+
+  async updateVariant(variantId: string, updateData: UpdateVariantDto) {
+    const { image, ...otherData } = updateData;
+    const variant = await this.prisma.productVariant.findUnique({
+      where: { id: variantId },
+    });
+    if (!variant) {
+      throw new NotFoundException(`Variant with ID ${variantId} not found`);
+    }
+
+    const updatedVariant = await this.prisma.productVariant.update({
+      where: { id: variantId },
+      data: otherData,
+      include: {
+        Inventory: true,
+      },
+    });
+
+    if (image) {
+      await this.prisma.productImage.create({
+        data: {
+          url: image,
+          color: updateData.color,
+          productId: variant.productId,
+        },
+      });
+    }
+
+    return updatedVariant;
   }
 
   async findAll(
@@ -242,9 +312,9 @@ export class ProductsService {
     const formattedProducts = products.map((product) => ({
       name: product.name,
       description: product.description,
-      category: product.category.name,
+      category: product.category,
       tags: product.tags,
-      image: product.images.length > 0 ? product.images[0].url : null,
+      images: product.images,
       variants: product.variants.map(({ color, size, id }) => ({
         color,
         size,
@@ -404,38 +474,13 @@ export class ProductsService {
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
-    const { variants, images, ...productData } = updateProductDto;
+    const { images, ...productData } = updateProductDto;
 
-    // Update product data
     await this.prisma.product.update({
       where: { id },
       data: productData,
     });
 
-    // Update variants and inventory
-    if (variants) {
-      for (const variant of variants) {
-        if (variant.id) {
-          // Update existing variant
-          await this.prisma.productVariant.update({
-            where: { id: variant.id },
-            data: {
-              color: variant.color,
-              size: variant.size,
-            },
-          });
-        } else {
-          // Create new variant
-          await this.prisma.productVariant.create({
-            data: {
-              productId: id,
-              color: variant.color,
-              size: variant.size,
-            },
-          });
-        }
-      }
-    }
     if (images) {
       await this.prisma.productImage.deleteMany({
         where: { productId: id },
@@ -459,9 +504,26 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    return this.prisma.product.delete({
+    const product = await this.prisma.product.findUnique({
       where: { id },
     });
+
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found.`);
+    }
+
+    try {
+      await this.prisma.product.update({
+        where: { id },
+        data: { deleted: true },
+      });
+      return { message: 'Product deactivated successfully' };
+    } catch (error) {
+      console.error('Error removing product:', error);
+      throw new InternalServerErrorException(
+        'An error occurred while removing the product.',
+      );
+    }
   }
 
   async getBestDeals(limit: number) {

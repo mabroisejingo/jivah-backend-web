@@ -68,7 +68,7 @@ export class InventoryController {
     });
   }
 
-  @Get(':id')
+  @Get(':id/id')
   @ApiOperation({ summary: 'Get an inventory by id' })
   @ApiResponse({ status: 200, description: 'Return the inventory.' })
   findOne(@Param('id') id: string) {
@@ -76,23 +76,39 @@ export class InventoryController {
   }
 
   @Get('product/:productId')
-  @ApiOperation({ summary: 'Get inventory for a specific product' })
+  @ApiOperation({ summary: 'Get paginated inventory for a specific product' })
   @ApiResponse({
     status: 200,
-    description: 'Return the inventory for the product.',
+    description: 'Return the paginated inventory for the product.',
   })
-  findByProduct(@Param('productId') productId: string) {
-    return this.inventoryService.findByProduct(productId);
+  findByProduct(
+    @Param('productId') productId: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.inventoryService.findByProduct(
+      productId,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get('variant/:variantId')
-  @ApiOperation({ summary: 'Get inventory for a specific variant' })
+  @ApiOperation({ summary: 'Get paginated inventory for a specific variant' })
   @ApiResponse({
     status: 200,
-    description: 'Return the inventory for the variant.',
+    description: 'Return the paginated inventory for the variant.',
   })
-  findByVariant(@Param('variantId') variantId: string) {
-    return this.inventoryService.findByVariant(variantId);
+  findByVariant(
+    @Param('variantId') variantId: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.inventoryService.findByVariant(
+      variantId,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Post()
@@ -102,7 +118,7 @@ export class InventoryController {
     return this.inventoryService.create(createInventoryDto);
   }
 
-  @Patch(':id')
+  @Patch(':id/id')
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.EMPLOYEE)
   update(
@@ -112,7 +128,7 @@ export class InventoryController {
     return this.inventoryService.update(id, updateInventoryDto);
   }
 
-  @Delete(':id')
+  @Delete(':id/id')
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.EMPLOYEE)
   remove(@Param('id') id: string) {

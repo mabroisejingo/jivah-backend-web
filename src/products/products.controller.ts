@@ -21,6 +21,8 @@ import { Request } from 'express';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { Role } from '@prisma/client';
+import { CreateVariantDto } from './dto/create-variant.dto';
+import { UpdateVariantDto } from './dto/update-variant.dto';
 
 @Controller('products')
 @ApiTags('Products')
@@ -204,5 +206,29 @@ export class ProductsController {
   @Get('filters')
   async getFilterOptions() {
     return this.productsService.getFilterOptions();
+  }
+
+  @Post(':id/variants')
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  addVariant(
+    @Param('id') id: string,
+    @Body() createVariantDto: CreateVariantDto,
+  ) {
+    return this.productsService.addVariant(id, createVariantDto);
+  }
+
+  @Delete('variants/:id')
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  removeVariant(@Param('id') id: string) {
+    return this.productsService.removeVariant(id);
+  }
+
+  @Patch('variants/:id')
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  updateVariant(
+    @Param('id') id: string,
+    @Body() updateVariantDto: UpdateVariantDto,
+  ) {
+    return this.productsService.updateVariant(id, updateVariantDto);
   }
 }

@@ -83,12 +83,121 @@ export class InventoryService {
             },
           },
         },
+        Sale: true,
       },
     });
 
     const total = await this.prisma.inventory.count({ where });
 
-    return { items: inventories, total };
+    // Add soldQuantity to each inventory
+    const itemsWithSoldQuantity = inventories.map((inventory) => {
+      const soldQuantity = inventory.Sale.reduce(
+        (sum, sale) => sum + sale.quantity,
+        0,
+      );
+      return { ...inventory, soldQuantity };
+    });
+
+    return { items: itemsWithSoldQuantity, total };
+  }
+
+  async findByProduct(productId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [inventories, total] = await Promise.all([
+      this.prisma.inventory.findMany({
+        where: {
+          variant: {
+            productId,
+          },
+        },
+        include: {
+          variant: true,
+          discounts: true,
+          Sale: true, // Assuming a relation to Sale
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.inventory.count({
+        where: {
+          variant: {
+            productId,
+          },
+        },
+      }),
+    ]);
+
+    if (inventories.length === 0) {
+      throw new NotFoundException(
+        `No inventory found for product with ID ${productId}`,
+      );
+    }
+
+    // Add soldQuantity to each inventory
+    const itemsWithSoldQuantity = inventories.map((inventory) => {
+      const soldQuantity = inventory.Sale.reduce(
+        (sum, sale) => sum + sale.quantity,
+        0,
+      );
+      return { ...inventory, soldQuantity };
+    });
+
+    return {
+      total,
+      page,
+      limit,
+      items: itemsWithSoldQuantity,
+    };
+  }
+
+  async findByVariant(variantId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [inventories, total] = await Promise.all([
+      this.prisma.inventory.findMany({
+        where: {
+          variantId,
+        },
+        include: {
+          variant: {
+            include: {
+              product: true,
+            },
+          },
+          Sale: true,
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.inventory.count({
+        where: {
+          variantId,
+        },
+      }),
+    ]);
+
+    if (inventories.length === 0) {
+      throw new NotFoundException(
+        `No inventory found for variant with ID ${variantId}`,
+      );
+    }
+
+    // Add soldQuantity to each inventory
+    const itemsWithSoldQuantity = inventories.map((inventory) => {
+      const soldQuantity = inventory.Sale.reduce(
+        (sum, sale) => sum + sale.quantity,
+        0,
+      );
+      return { ...inventory, soldQuantity };
+    });
+
+    return {
+      total,
+      page,
+      limit,
+      items: itemsWithSoldQuantity,
+    };
   }
 
   async findOne(id: string) {
@@ -114,50 +223,6 @@ export class InventoryService {
     return inventory;
   }
 
-  async findByProduct(productId: string) {
-    const inventories = await this.prisma.inventory.findMany({
-      where: {
-        variant: {
-          productId,
-        },
-      },
-      include: {
-        variant: true,
-      },
-    });
-
-    if (inventories.length === 0) {
-      throw new NotFoundException(
-        `No inventory found for product with ID ${productId}`,
-      );
-    }
-
-    return inventories;
-  }
-
-  async findByVariant(variantId: string) {
-    const inventory = await this.prisma.inventory.findFirst({
-      where: {
-        variantId,
-      },
-      include: {
-        variant: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
-
-    if (!inventory) {
-      throw new NotFoundException(
-        `No inventory found for variant with ID ${variantId}`,
-      );
-    }
-
-    return inventory;
-  }
-
   async create(createInventoryDto: CreateInventoryDto) {
     const { variantId, quantity, price } = createInventoryDto;
     const existingInventory = await this.prisma.inventory.findFirst({
@@ -175,7 +240,6 @@ export class InventoryService {
         },
       });
     } else {
-
       return this.prisma.inventory.create({
         data: createInventoryDto,
       });
@@ -190,8 +254,9 @@ export class InventoryService {
   }
 
   async remove(id: string) {
-    return this.prisma.inventory.delete({
+    return this.prisma.inventory.update({
       where: { id },
+      data: { deleted: true },
     });
   }
 }
