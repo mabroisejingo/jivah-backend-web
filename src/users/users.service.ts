@@ -36,35 +36,39 @@ export class UsersService {
   }
 
   async findAll(params: {
-    skip?: number;
-    take?: number;
+    page?: number;
+    limit?: number;
     search?: string;
-  }): Promise<{ users: User[]; total: number }> {
-    const { skip, take, search } = params;
+    role?: Role;
+  }): Promise<{ items: User[]; total: number; page: number; limit: number }> {
+    const pageNumber = Number(params.page) || 1;
+    const limitNumber = Number(params.limit) || 10;
+    const search = params.search;
 
     const where: Prisma.UserWhereInput = {
-      role: Role.USER,
+      role: params.role,
       deleted: false,
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { username: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
     };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        skip,
-        take,
+        skip: (pageNumber - 1) * limitNumber,
+        take: limitNumber,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.user.count({ where }),
     ]);
 
-    return { users, total };
+    return { items: users, page: pageNumber, limit: limitNumber, total };
   }
 
   async createEmployee(createEmployeeDto: CreateEmployeeDto): Promise<User> {
@@ -285,20 +289,5 @@ export class UsersService {
       });
       return { message: 'Product added to favorites' };
     }
-  }
-
-  async findAllEmployees(): Promise<User[]> {
-    const [employees, total] = await Promise.all([
-      this.prisma.user.findMany({
-        where: {
-          role: Role.EMPLOYEE,
-          deleted: false,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.user.count(),
-    ]);
-
-    return employees;
   }
 }

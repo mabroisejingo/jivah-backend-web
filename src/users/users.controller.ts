@@ -36,14 +36,16 @@ export class UsersController {
 
   @Get()
   async findAll(
-    @Query('skip') skip: number = 0,
-    @Query('take') take: number = 10,
-    @Query('search') search: string = '',
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
+    @Query('role') role?: Role,
   ) {
     return this.usersService.findAll({
-      skip,
-      take,
-      search,
+      page: Number(page),
+      limit: Number(limit),
+      search: search || undefined,
+      role: role || undefined,
     });
   }
 
@@ -124,11 +126,5 @@ export class UsersController {
   @Roles(Role.ADMIN)
   async createEmployee(@Body() createEmployeeDto: CreateEmployeeDto) {
     return this.usersService.createEmployee(createEmployeeDto);
-  }
-
-  @Get('employees')
-  @Roles(Role.ADMIN)
-  async findAllEmployees() {
-    return this.usersService.findAllEmployees();
   }
 }

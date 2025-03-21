@@ -6,10 +6,9 @@ import { UpdateInventoryDto } from './dto/update-inventory.dto';
 @Injectable()
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
-
   async findAll(params: {
-    skip?: number;
-    take?: number;
+    page?: number;
+    limit?: number;
     orderBy?: string;
     sortOrder?: 'asc' | 'desc';
     filters?: {
@@ -22,7 +21,7 @@ export class InventoryService {
       search?: string;
     };
   }) {
-    const { skip, take, orderBy, sortOrder, filters } = params;
+    const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
     const where: any = {};
 
     if (filters) {
@@ -70,8 +69,8 @@ export class InventoryService {
 
     const inventories = await this.prisma.inventory.findMany({
       where,
-      skip,
-      take,
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: orderBy ? { [orderBy]: sortOrder || 'asc' } : undefined,
       include: {
         variant: {
@@ -89,7 +88,6 @@ export class InventoryService {
 
     const total = await this.prisma.inventory.count({ where });
 
-    // Add soldQuantity to each inventory
     const itemsWithSoldQuantity = inventories.map((inventory) => {
       const soldQuantity = inventory.Sale.reduce(
         (sum, sale) => sum + sale.quantity,
@@ -98,7 +96,7 @@ export class InventoryService {
       return { ...inventory, soldQuantity };
     });
 
-    return { items: itemsWithSoldQuantity, total };
+    return { items: itemsWithSoldQuantity, total, page, limit };
   }
 
   async findByProduct(productId: string, page: number = 1, limit: number = 10) {
@@ -106,26 +104,12 @@ export class InventoryService {
 
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
-        where: {
-          variant: {
-            productId,
-          },
-        },
-        include: {
-          variant: true,
-          discounts: true,
-          Sale: true, // Assuming a relation to Sale
-        },
+        where: { variant: { productId } },
+        include: { variant: true, discounts: true, Sale: true },
         skip,
         take: limit,
       }),
-      this.prisma.inventory.count({
-        where: {
-          variant: {
-            productId,
-          },
-        },
-      }),
+      this.prisma.inventory.count({ where: { variant: { productId } } }),
     ]);
 
     if (inventories.length === 0) {
@@ -134,7 +118,6 @@ export class InventoryService {
       );
     }
 
-    // Add soldQuantity to each inventory
     const itemsWithSoldQuantity = inventories.map((inventory) => {
       const soldQuantity = inventory.Sale.reduce(
         (sum, sale) => sum + sale.quantity,
@@ -143,12 +126,7 @@ export class InventoryService {
       return { ...inventory, soldQuantity };
     });
 
-    return {
-      total,
-      page,
-      limit,
-      items: itemsWithSoldQuantity,
-    };
+    return { total, page, limit, items: itemsWithSoldQuantity };
   }
 
   async findByVariant(variantId: string, page: number = 1, limit: number = 10) {
@@ -156,25 +134,12 @@ export class InventoryService {
 
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
-        where: {
-          variantId,
-        },
-        include: {
-          variant: {
-            include: {
-              product: true,
-            },
-          },
-          Sale: true,
-        },
+        where: { variantId },
+        include: { variant: { include: { product: true } }, Sale: true },
         skip,
         take: limit,
       }),
-      this.prisma.inventory.count({
-        where: {
-          variantId,
-        },
-      }),
+      this.prisma.inventory.count({ where: { variantId } }),
     ]);
 
     if (inventories.length === 0) {
@@ -183,7 +148,6 @@ export class InventoryService {
       );
     }
 
-    // Add soldQuantity to each inventory
     const itemsWithSoldQuantity = inventories.map((inventory) => {
       const soldQuantity = inventory.Sale.reduce(
         (sum, sale) => sum + sale.quantity,
@@ -192,12 +156,7 @@ export class InventoryService {
       return { ...inventory, soldQuantity };
     });
 
-    return {
-      total,
-      page,
-      limit,
-      items: itemsWithSoldQuantity,
-    };
+    return { total, page, limit, items: itemsWithSoldQuantity };
   }
 
   async findOne(id: string) {

@@ -26,8 +26,8 @@ export class InventoryController {
   @Get()
   @ApiOperation({ summary: 'Get all inventories' })
   @ApiResponse({ status: 200, description: 'Return all inventories.' })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
-  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'orderBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
   @ApiQuery({ name: 'minPrice', required: false, type: Number })
@@ -39,8 +39,8 @@ export class InventoryController {
   @ApiQuery({ name: 'search', required: false, type: String })
   findAll(@Query() query: any) {
     const {
-      skip,
-      take,
+      page,
+      limit,
       orderBy,
       sortOrder,
       minPrice,
@@ -52,8 +52,8 @@ export class InventoryController {
       search,
     } = query;
     return this.inventoryService.findAll({
-      skip: skip ? parseInt(skip) : undefined,
-      take: take ? parseInt(take) : undefined,
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
       orderBy,
       sortOrder,
       filters: {
