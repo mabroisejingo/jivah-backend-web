@@ -83,6 +83,7 @@ model ProductVariant {
   productId String
   color     String
   size      String
+  deleted   Boolean     @default(false)
   product   Product     @relation(fields: [productId], references: [id])
   Inventory Inventory[]
 }

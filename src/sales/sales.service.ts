@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
-import { GetSalesDto } from './dto/get-sales.dto';
 import { Sale, SaleStatus } from '@prisma/client';
 
 @Injectable()
@@ -57,18 +56,103 @@ export class SalesService {
   }
 
   async findAll(
-    getSalesDto: GetSalesDto,
+    status?: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
   ): Promise<{ items: Sale[]; total: number; page: number; limit: number }> {
-    const { status, page = 1, limit = 10 } = getSalesDto;
+    // Ensure page and limit are valid numbers
+    page = Number(page);
+    limit = Number(limit);
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+
     const skip = (page - 1) * limit;
 
-    const where = status ? { status } : {};
+    const where: any = {};
+
+    // Filtering by status
+    if (status) where.status = status;
+
+    // Searching across multiple fields
+    if (search) {
+      where.OR = [
+        { client: { contains: search, mode: 'insensitive' } },
+        { user: { name: { contains: search, mode: 'insensitive' } } }, // Assuming user has 'name' field
+        {
+          inventory: {
+            variant: {
+              product: { name: { contains: search, mode: 'insensitive' } },
+            },
+          },
+        }, // Assuming Product has 'name'
+      ];
+    }
 
     const [sales, total] = await this.prisma.$transaction([
       this.prisma.sale.findMany({
         where,
         skip,
-        take: limit,
+        take: limit, // Ensure limit is a number
+        include: {
+          inventory: { include: { variant: { include: { product: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.sale.count({ where }),
+    ]);
+
+    return { items: sales, total, page, limit };
+  }
+
+  async findAllByProduct(
+    productId: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<{ items: Sale[]; total: number; page: number; limit: number }> {
+    // Ensure page and limit are valid numbers
+    page = Number(page);
+    limit = Number(limit);
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      inventory: {
+        variant: {
+          productId,
+        },
+      },
+    };
+
+    // Filtering by status
+    if (status) where.status = status;
+
+    // Searching across multiple fields
+    if (search) {
+      where.OR = [
+        { client: { contains: search, mode: 'insensitive' } },
+        { user: { name: { contains: search, mode: 'insensitive' } } }, // Assuming user has 'name' field
+        {
+          inventory: {
+            variant: {
+              product: { name: { contains: search, mode: 'insensitive' } },
+            },
+          },
+        }, // Assuming Product has 'name'
+      ];
+    }
+
+    const [sales, total] = await this.prisma.$transaction([
+      this.prisma.sale.findMany({
+        where,
+        skip,
+        take: limit, // Ensure limit is a number
         include: {
           inventory: { include: { variant: { include: { product: true } } } },
         },

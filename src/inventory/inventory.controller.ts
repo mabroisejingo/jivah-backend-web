@@ -17,6 +17,8 @@ import { JwtGuard } from 'src/auth/jwt.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Role } from '@prisma/client';
 import { Roles } from 'src/auth/roles.decorator';
+import { UpdateDiscountDto } from './dto/update-discount.dto';
+import { CreateDiscountDto } from './dto/create-discount.dto';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -133,5 +135,48 @@ export class InventoryController {
   @Roles(Role.ADMIN, Role.EMPLOYEE)
   remove(@Param('id') id: string) {
     return this.inventoryService.remove(id);
+  }
+
+  @Post(':id/discount')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @ApiOperation({ summary: 'Add a discount to an inventory' })
+  @ApiResponse({ status: 201, description: 'Discount added successfully.' })
+  createDiscount(
+    @Param('id') inventoryId: string,
+    @Body() createDiscountDto: CreateDiscountDto,
+  ) {
+    return this.inventoryService.createDiscount(inventoryId, createDiscountDto);
+  }
+
+  @Get(':id/discounts')
+  @ApiOperation({ summary: 'Get all discounts for an inventory' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all discounts for the inventory.',
+  })
+  getAllDiscounts(@Param('id') inventoryId: string) {
+    return this.inventoryService.getAllDiscounts(inventoryId);
+  }
+
+  @Patch('discount/:discountId')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @ApiOperation({ summary: 'Update an inventory discount' })
+  @ApiResponse({ status: 200, description: 'Discount updated successfully.' })
+  updateDiscount(
+    @Param('discountId') discountId: string,
+    @Body() updateDiscountDto: UpdateDiscountDto,
+  ) {
+    return this.inventoryService.updateDiscount(discountId, updateDiscountDto);
+  }
+
+  @Delete('discount/:discountId')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @ApiOperation({ summary: 'Delete an inventory discount' })
+  @ApiResponse({ status: 200, description: 'Discount deleted successfully.' })
+  removeDiscount(@Param('discountId') discountId: string) {
+    return this.inventoryService.removeDiscount(discountId);
   }
 }

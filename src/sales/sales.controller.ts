@@ -10,7 +10,6 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
-import { GetSalesDto } from './dto/get-sales.dto';
 import { Sale } from '@prisma/client';
 
 @ApiTags('sales')
@@ -32,12 +31,28 @@ export class SalesController {
   @ApiOperation({ summary: 'Get all sales' })
   @ApiResponse({ status: 200, description: 'Return all sales.' })
   findAll(
-    @Query() getSalesDto: GetSalesDto,
+    @Query('status') status?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
   ): Promise<{ items: Sale[]; total: number; page: number; limit: number }> {
-    return this.salesService.findAll(getSalesDto);
+    return this.salesService.findAll(status, page, limit, search);
   }
 
-  @Get(':id')
+  @Get(':id/product')
+  @ApiOperation({ summary: 'Get all sales' })
+  @ApiResponse({ status: 200, description: 'Return all sales.' })
+  findAllByProduct(
+    @Param('id') id: string,
+    @Query('status') status?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
+  ): Promise<{ items: Sale[]; total: number; page: number; limit: number }> {
+    return this.salesService.findAllByProduct(id, status, page, limit, search);
+  }
+
+  @Get(':id/id')
   @ApiOperation({ summary: 'Get a sale by id' })
   @ApiResponse({ status: 200, description: 'Return the sale.' })
   @ApiResponse({ status: 404, description: 'Sale not found.' })
@@ -45,7 +60,7 @@ export class SalesController {
     return this.salesService.findOne(id);
   }
 
-  @Delete(':id')
+  @Delete(':id/id')
   @ApiOperation({ summary: 'Cancel a sale' })
   @ApiResponse({
     status: 200,

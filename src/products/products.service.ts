@@ -24,7 +24,6 @@ export class ProductsService {
 
   async create(createProductDto: CreateProductDto) {
     const { images, ...productData } = createProductDto;
-
     return this.prisma.product.create({
       data: {
         ...productData,
@@ -51,7 +50,6 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with ID ${productId} not found`);
     }
-
     const newVariant = await this.prisma.productVariant.create({
       data: {
         size: variantData.size,
@@ -62,7 +60,6 @@ export class ProductsService {
         Inventory: true,
       },
     });
-
     await this.prisma.productImage.create({
       data: {
         url: variantData.image,
@@ -70,7 +67,6 @@ export class ProductsService {
         productId,
       },
     });
-
     return newVariant;
   }
 
@@ -82,8 +78,9 @@ export class ProductsService {
       throw new NotFoundException(`Variant with ID ${variantId} not found`);
     }
 
-    return this.prisma.productVariant.delete({
+    return this.prisma.productVariant.update({
       where: { id: variantId },
+      data: { deleted: true },
     });
   }
 
@@ -95,7 +92,6 @@ export class ProductsService {
     if (!variant) {
       throw new NotFoundException(`Variant with ID ${variantId} not found`);
     }
-
     const updatedVariant = await this.prisma.productVariant.update({
       where: { id: variantId },
       data: otherData,
@@ -103,7 +99,6 @@ export class ProductsService {
         Inventory: true,
       },
     });
-
     if (image) {
       await this.prisma.productImage.create({
         data: {
@@ -113,7 +108,6 @@ export class ProductsService {
         },
       });
     }
-
     return updatedVariant;
   }
 
@@ -140,7 +134,6 @@ export class ProductsService {
     },
     req: any,
   ) {
-    console.log(params);
     let userId: string | null = null;
 
     try {
@@ -298,9 +291,16 @@ export class ProductsService {
       where,
       skip,
       take: limit,
+      orderBy: {
+        updatedAt: 'desc',
+      },
       include: {
         category: true,
-        variants: true,
+        variants: {
+          where: {
+            deleted: false,
+          },
+        },
         reviews: true,
         Favorite: true,
         images: true,
@@ -388,8 +388,8 @@ export class ProductsService {
         color,
         size,
         variantId: id,
-        price: Inventory[0].price,
-        quantity: Inventory[0].quantity,
+        price: Inventory[0]?.price || 0,
+        quantity: Inventory[0]?.quantity || 0,
       })),
       reviewsCount: product.reviews.length,
       isFavorite: true,
@@ -412,13 +412,38 @@ export class ProductsService {
         reviews: true,
         category: true,
         variants: {
+          where: {
+            deleted: false,
+          },
           include: {
-            Inventory: true,
+            Inventory: {
+              include: {
+                Sale: true,
+              },
+            },
           },
         },
       },
     });
-    return product;
+
+    // Calculate the sold quantity
+    const soldQuantity = product.variants.reduce((totalSold, variant) => {
+      const variantSold = variant.Inventory.reduce(
+        (variantTotal, inventory) => {
+          // Sum the quantity of items sold from the related Sales
+          const quantitySold = inventory.Sale.reduce((saleTotal, sale) => {
+            return saleTotal + sale.quantity;
+          }, 0);
+          return variantTotal + quantitySold;
+        },
+        0,
+      );
+      return totalSold + variantSold;
+    }, 0);
+    return {
+      ...product,
+      soldQuantity,
+    };
   }
 
   async getRelatedProducts(id: string) {
