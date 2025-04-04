@@ -18,9 +18,9 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { JwtGuard } from 'src/auth/jwt.guard';
 import { Request } from 'express';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { Roles } from 'src/auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { PrivilegesGuard } from 'src/auth/privileges.guard';
+import { Privileges } from 'src/auth/privileges.decorator';
+import { Privilege } from '@prisma/client';
 import { CreateVariantDto } from './dto/create-variant.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
 
@@ -30,6 +30,8 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.CREATE_PRODUCTS)
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
   }
@@ -69,8 +71,8 @@ export class ProductsController {
   }
 
   @Get('products')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.VIEW_PRODUCTS)
   findAllProducts(@Query() query: any) {
     const { page, limit, category, tags, colors, sizes, search } = query;
 
@@ -88,7 +90,8 @@ export class ProductsController {
   }
 
   @Get('favorites')
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.ADD_FAVORITES)
   @ApiOperation({ summary: 'Get favorite products for the logged-in user' })
   @ApiResponse({ status: 200, description: 'Returns the favorite products' })
   async getFavoriteProducts(
@@ -134,22 +137,22 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
   @Patch(':id/id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_PRODUCTS)
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.update(id, updateProductDto);
   }
 
   @Delete(':id/id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.DELETE_PRODUCTS)
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
 
   @Post('categories')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.CREATE_CATEGORIES)
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({
     status: 201,
@@ -175,8 +178,8 @@ export class ProductsController {
   }
 
   @Patch('categories/:id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_CATEGORIES)
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({
     status: 200,
@@ -191,8 +194,8 @@ export class ProductsController {
   }
 
   @Delete('categories/:id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.DELETE_CATEGORIES)
   @ApiOperation({ summary: 'Delete a category' })
   @ApiResponse({
     status: 200,
@@ -209,7 +212,8 @@ export class ProductsController {
   }
 
   @Post(':id/variants')
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_PRODUCTS)
   addVariant(
     @Param('id') id: string,
     @Body() createVariantDto: CreateVariantDto,
@@ -218,13 +222,15 @@ export class ProductsController {
   }
 
   @Delete('variants/:id')
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_PRODUCTS)
   removeVariant(@Param('id') id: string) {
     return this.productsService.removeVariant(id);
   }
 
   @Patch('variants/:id')
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_PRODUCTS)
   updateVariant(
     @Param('id') id: string,
     @Body() updateVariantDto: UpdateVariantDto,

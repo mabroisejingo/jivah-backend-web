@@ -14,11 +14,11 @@ import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtGuard } from 'src/auth/jwt.guard';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { Role } from '@prisma/client';
-import { Roles } from 'src/auth/roles.decorator';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { CreateDiscountDto } from './dto/create-discount.dto';
+import { Privileges } from 'src/auth/privileges.decorator';
+import { PrivilegesGuard } from 'src/auth/privileges.guard';
+import { Privilege } from '@prisma/client';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -77,6 +77,13 @@ export class InventoryController {
     return this.inventoryService.findOne(id);
   }
 
+  @Get(':id/barcode')
+  @ApiOperation({ summary: 'Get an inventory by barcode' })
+  @ApiResponse({ status: 200, description: 'Return the inventory.' })
+  findOneBarcode(@Param('id') id: string) {
+    return this.inventoryService.findOneBarcode(id);
+  }
+
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get paginated inventory for a specific product' })
   @ApiResponse({
@@ -114,15 +121,15 @@ export class InventoryController {
   }
 
   @Post()
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.CREATE_INVENTORY)
   create(@Body() createInventoryDto: CreateInventoryDto) {
     return this.inventoryService.create(createInventoryDto);
   }
 
   @Patch(':id/id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_INVENTORY)
   update(
     @Param('id') id: string,
     @Body() updateInventoryDto: UpdateInventoryDto,
@@ -131,15 +138,15 @@ export class InventoryController {
   }
 
   @Delete(':id/id')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.DELETE_INVENTORY)
   remove(@Param('id') id: string) {
     return this.inventoryService.remove(id);
   }
 
   @Post(':id/discount')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.CREATE_DISCOUNTS)
   @ApiOperation({ summary: 'Add a discount to an inventory' })
   @ApiResponse({ status: 201, description: 'Discount added successfully.' })
   createDiscount(
@@ -160,8 +167,8 @@ export class InventoryController {
   }
 
   @Patch('discount/:discountId')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.UPDATE_DISCOUNTS)
   @ApiOperation({ summary: 'Update an inventory discount' })
   @ApiResponse({ status: 200, description: 'Discount updated successfully.' })
   updateDiscount(
@@ -172,8 +179,8 @@ export class InventoryController {
   }
 
   @Delete('discount/:discountId')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.EMPLOYEE)
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  @Privileges(Privilege.DELETE_DISCOUNTS)
   @ApiOperation({ summary: 'Delete an inventory discount' })
   @ApiResponse({ status: 200, description: 'Discount deleted successfully.' })
   removeDiscount(@Param('discountId') discountId: string) {

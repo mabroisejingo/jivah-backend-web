@@ -85,14 +85,14 @@ export class InventoryService {
             },
           },
         },
-        Sale: true,
+        SaleItem: true,
       },
     });
 
     const total = await this.prisma.inventory.count({ where });
 
     const itemsWithSoldQuantity = inventories.map((inventory) => {
-      const soldQuantity = inventory.Sale.reduce(
+      const soldQuantity = inventory.SaleItem.reduce(
         (sum, sale) => sum + sale.quantity,
         0,
       );
@@ -108,7 +108,7 @@ export class InventoryService {
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
         where: { variant: { productId } },
-        include: { variant: true, discounts: true, Sale: true },
+        include: { variant: true, discounts: true, SaleItem: true },
         skip,
         take: limit,
       }),
@@ -121,7 +121,7 @@ export class InventoryService {
     }
 
     const itemsWithSoldQuantity = inventories.map((inventory) => {
-      const soldQuantity = inventory.Sale.reduce(
+      const soldQuantity = inventory.SaleItem.reduce(
         (sum, sale) => sum + sale.quantity,
         0,
       );
@@ -137,7 +137,7 @@ export class InventoryService {
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
         where: { variantId },
-        include: { variant: { include: { product: true } }, Sale: true },
+        include: { variant: { include: { product: true } }, SaleItem: true },
         skip,
         take: limit,
       }),
@@ -151,7 +151,7 @@ export class InventoryService {
     }
 
     const itemsWithSoldQuantity = inventories.map((inventory) => {
-      const soldQuantity = inventory.Sale.reduce(
+      const soldQuantity = inventory.SaleItem.reduce(
         (sum, sale) => sum + sale.quantity,
         0,
       );
@@ -179,6 +179,38 @@ export class InventoryService {
 
     if (!inventory) {
       throw new NotFoundException(`Inventory with ID ${id} not found`);
+    }
+
+    return inventory;
+  }
+
+  async findOneBarcode(barcode: string) {
+    const currentDate = new Date();
+
+    const inventory = await this.prisma.inventory.findFirst({
+      where: { barcode },
+      include: {
+        discounts: {
+          where: {
+            startDate: { lte: currentDate }, // Discount start date should be less than or equal to today
+            endDate: { gte: currentDate }, // Discount end date should be greater than or equal to today
+          },
+        },
+        variant: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                images: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!inventory) {
+      throw new NotFoundException(`No Inventory found related to the barcode`);
     }
 
     return inventory;

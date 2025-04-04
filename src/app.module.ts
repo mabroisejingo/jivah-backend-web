@@ -11,6 +11,7 @@ import { FileUploadModule } from './file-upload/file-upload.module';
 import { CartModule } from './cart/cart.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalesModule } from './sales/sales.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SalesModule } from './sales/sales.module';
     CartModule,
     SalesModule,
     NotificationsModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [PrismaService],

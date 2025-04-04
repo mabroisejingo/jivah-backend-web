@@ -40,7 +40,7 @@ export class CartService {
       const { color, size } = product.variant;
       const inventoryPrice = product.price;
 
-      let subTotal = inventoryPrice * quantity;
+      const subTotal = inventoryPrice * quantity;
       totalSubTotal += subTotal;
 
       const discount = product.discounts.reduce((acc, discount) => {
@@ -70,6 +70,7 @@ export class CartService {
           color,
           size,
         },
+        inventoryId: item.inventoryId,
         quantity,
         price: item.product.price,
       };

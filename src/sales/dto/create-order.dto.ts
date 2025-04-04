@@ -41,13 +41,28 @@ class SaleClientDto {
   @IsString()
   @IsNotEmpty()
   phone: string;
-}
 
-export class CreateSaleDto {
-  @ApiProperty({ description: 'The payment method used for the sale' })
+  @ApiProperty({ description: 'Client address' })
   @IsString()
-  paymentMethod: string;
+  @IsNotEmpty()
+  address: string;
 
+  @ApiProperty({ description: 'Client city' })
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+
+  @ApiProperty({ description: 'Client state' })
+  @IsString()
+  @IsNotEmpty()
+  state: string;
+
+  @ApiProperty({ description: 'Client country' })
+  @IsString()
+  @IsNotEmpty()
+  country: string;
+}
+export class CreateOrderDto {
   @ApiProperty({
     description: 'List of items in the sale',
     type: () => [SaleItemDto],

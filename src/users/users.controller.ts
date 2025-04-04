@@ -23,13 +23,15 @@ import { Request } from 'express';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
-import { Roles } from 'src/auth/roles.decorator';
-import { RolesGuard } from 'src/auth/roles.guard';
-import { Role } from '@prisma/client';
+import { Privileges } from 'src/auth/privileges.decorator';
+import { PrivilegesGuard } from 'src/auth/privileges.guard';
+import { Privilege } from '@prisma/client';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtGuard, RolesGuard)
+@UseGuards(JwtGuard, PrivilegesGuard)
 @ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -39,7 +41,7 @@ export class UsersController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search?: string,
-    @Query('role') role?: Role,
+    @Query('role') role?: 'USER' | 'EMPLOYEE',
   ) {
     return this.usersService.findAll({
       page: Number(page),
@@ -123,8 +125,58 @@ export class UsersController {
   }
 
   @Post('employees')
-  @Roles(Role.ADMIN)
+  @Privileges(Privilege.CREATE_EMPLOYEES)
   async createEmployee(@Body() createEmployeeDto: CreateEmployeeDto) {
     return this.usersService.createEmployee(createEmployeeDto);
+  }
+
+  @Post('roles')
+  @Privileges(Privilege.CREATE_ROLES)
+  @ApiOperation({ summary: 'Create a new role' })
+  @ApiResponse({
+    status: 201,
+    description: 'The role has been successfully created.',
+  })
+  createRole(@Body() createRoleDto: CreateRoleDto) {
+    return this.usersService.createRole(createRoleDto);
+  }
+
+  @Get('roles')
+  @ApiOperation({ summary: 'Get all roles' })
+  @ApiResponse({ status: 200, description: 'Return all roles.' })
+  findAllRoles(@Query('page') page = '1', @Query('limit') limit = '10') {
+    return this.usersService.findAllRoles(parseInt(page), parseInt(limit));
+  }
+
+  @Get('roles/:id')
+  @ApiOperation({ summary: 'Get a role by id' })
+  @ApiResponse({ status: 200, description: 'Return the role.' })
+  @ApiResponse({ status: 404, description: 'Role not found.' })
+  findOneRole(@Param('id') id: string) {
+    return this.usersService.findOneRole(id);
+  }
+
+  @Patch('roles/:id')
+  @Privileges(Privilege.UPDATE_ROLES)
+  @ApiOperation({ summary: 'Update a role' })
+  @ApiResponse({
+    status: 200,
+    description: 'The role has been successfully updated.',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found.' })
+  updateRole(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto) {
+    return this.usersService.updateRole(id, updateRoleDto);
+  }
+
+  @Delete('roles/:id')
+  @Privileges(Privilege.DELETE_ROLES)
+  @ApiOperation({ summary: 'Delete a role' })
+  @ApiResponse({
+    status: 200,
+    description: 'The role has been successfully deleted.',
+  })
+  @ApiResponse({ status: 404, description: 'Role not found.' })
+  removeRole(@Param('id') id: string) {
+    return this.usersService.removeRole(id);
   }
 }

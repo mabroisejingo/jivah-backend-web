@@ -111,160 +111,6 @@ export class ProductsService {
     return updatedVariant;
   }
 
-  async findAll(
-    params: {
-      page?: number;
-      limit?: number;
-      orderBy?:
-        | 'most_popular'
-        | 'least_popular'
-        | 'latest'
-        | 'trending'
-        | string;
-      sortOrder?: 'asc' | 'desc';
-      filters?: {
-        minPrice?: number;
-        maxPrice?: number;
-        category?: string;
-        tags?: string[];
-        colors?: string[];
-        sizes?: string[];
-        search?: string;
-      };
-    },
-    req: any,
-  ) {
-    let userId: string | null = null;
-
-    try {
-      const authorization = req.headers.authorization || '';
-      const token = authorization.split(' ')[1];
-      if (token) {
-        const decoded = (await this.utils.verifyToken(token)) as any;
-        const user = await this.prisma.user.findUnique({
-          where: { id: decoded.id },
-        });
-        if (user) {
-          userId = user.id;
-        }
-      }
-    } catch (error) {
-      console.warn(
-        'Token verification failed or user not found. Continuing without user ID.',
-      );
-    }
-    const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
-    const skip = (page - 1) * limit;
-    const where: any = {};
-
-    if (filters) {
-      if (filters.minPrice || filters.maxPrice) {
-        where.price = {
-          gte: filters.minPrice,
-          lte: filters.maxPrice,
-        };
-      }
-      if (filters.colors) where.variant = { color: { in: filters.colors } };
-      if (filters.sizes) where.variant = { size: { in: filters.sizes } };
-      if (filters.category) {
-        where.variant = { product: { category: { name: filters.category } } };
-      }
-      if (filters.search) {
-        where.variant = {
-          product: {
-            OR: [
-              { name: { contains: filters.search, mode: 'insensitive' } },
-              { tags: { hasSome: [filters.search] } },
-            ],
-          },
-        };
-      }
-    }
-
-    let orderByClause: any = {};
-    if (orderBy) {
-      switch (orderBy) {
-        case 'most_popular':
-          orderByClause = {
-            variant: { product: { orders: { _count: 'desc' } } },
-          };
-          break;
-        case 'least_popular':
-          orderByClause = {
-            variant: { product: { orders: { _count: 'asc' } } },
-          };
-          break;
-        case 'latest':
-          orderByClause = { updatedAt: 'desc' };
-          break;
-        case 'trending':
-          orderByClause = {
-            variant: { product: { Favorite: { _count: 'desc' } } },
-          };
-          break;
-        default:
-          orderByClause = { [orderBy]: sortOrder || 'asc' };
-      }
-    }
-
-    const inventories = await this.prisma.inventory.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: orderByClause,
-      include: {
-        variant: {
-          include: {
-            product: {
-              include: {
-                category: true,
-                variants: true,
-                reviews: true,
-                Favorite: userId ? { where: { userId } } : false,
-                images: true,
-              },
-            },
-          },
-        },
-        discounts: true,
-      },
-    });
-
-    const total = await this.prisma.inventory.count({ where });
-
-    const products = inventories.map(
-      ({ variant, price, quantity, updatedAt, discounts }) => ({
-        price,
-        quantity,
-        updatedAt,
-        discounts,
-        name: variant.product.name,
-        image: variant.product.images.find(
-          (image) => image.color === variant.color,
-        )
-          ? variant.product.images.filter(
-              (image) => image.color === variant.color,
-            )[0].url
-          : variant.product.images[0].url,
-        description: variant.product.description,
-        category: variant.product.category.name,
-        tags: variant.product.tags,
-        color: variant.color,
-        size: variant.size,
-        isFavorited:
-          variant.product.Favorite && variant.product.Favorite.length > 0,
-        productId: variant.productId,
-      }),
-    );
-    return {
-      items: products,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
   async findAllProducts(params: {
     page?: number;
     limit?: number;
@@ -332,6 +178,288 @@ export class ProductsService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async findAll(
+    params: {
+      page?: number;
+      limit?: number;
+      orderBy?:
+        | 'most_popular'
+        | 'least_popular'
+        | 'latest'
+        | 'trending'
+        | string;
+      sortOrder?: 'asc' | 'desc';
+      filters?: {
+        minPrice?: number;
+        maxPrice?: number;
+        category?: string;
+        tags?: string[];
+        colors?: string[];
+        sizes?: string[];
+        search?: string;
+      };
+    },
+    req: any,
+  ) {
+    let userId: string | null = null;
+
+    try {
+      const authorization = req.headers.authorization || '';
+      const token = authorization.split(' ')[1];
+      if (token) {
+        const decoded = (await this.utils.verifyToken(token)) as any;
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.id },
+        });
+        if (user) {
+          userId = user.id;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        'Token verification failed or user not found. Continuing without user ID.',
+      );
+    }
+
+    const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (filters) {
+      if (filters.minPrice || filters.maxPrice) {
+        where.variants = {
+          some: {
+            Inventory: {
+              some: {
+                price: { gte: filters.minPrice, lte: filters.maxPrice },
+              },
+            },
+          },
+        };
+      }
+      if (filters.colors)
+        where.variants = { some: { color: { in: filters.colors } } };
+      if (filters.sizes)
+        where.variants = { some: { size: { in: filters.sizes } } };
+      if (filters.category) where.category = { name: filters.category };
+      if (filters.search) {
+        where.OR = [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { tags: { hasSome: [filters.search] } },
+        ];
+      }
+    }
+
+    let orderByClause: any = {};
+    if (orderBy) {
+      switch (orderBy) {
+        case 'most_popular':
+          orderByClause = { orders: { _count: 'desc' } };
+          break;
+        case 'least_popular':
+          orderByClause = { orders: { _count: 'asc' } };
+          break;
+        case 'latest':
+          orderByClause = { createdAt: 'desc' };
+          break;
+        case 'trending':
+          orderByClause = { Favorite: { _count: 'desc' } };
+          break;
+        default:
+          orderByClause = { [orderBy]: sortOrder || 'asc' };
+      }
+    }
+
+    let products = await this.prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: orderByClause,
+      include: {
+        category: true,
+        variants: {
+          include: {
+            Inventory: { include: { discounts: true } },
+          },
+        },
+        reviews: true,
+        Favorite: userId ? { where: { userId } } : false,
+        images: true,
+      },
+    });
+
+    products = products.sort(() => Math.random() - 0.5);
+
+    const total = await this.prisma.product.count({ where });
+
+    const formattedProducts = products.map((product) => ({
+      price: product.variants[0]?.Inventory[0]?.price || 0,
+      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
+      updatedAt: product.updatedAt,
+      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
+      name: product.name,
+      image: product.images.find(
+        (image) => image.color === product.variants[0]?.color,
+      )
+        ? product.images.filter(
+            (image) => image.color === product.variants[0]?.color,
+          )[0].url
+        : product.images[0]?.url || null,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      color: product.variants[0]?.color,
+      size: product.variants[0]?.size,
+      isFavorited: product.Favorite && product.Favorite.length > 0,
+      productId: product.id,
+    }));
+
+    return {
+      items: formattedProducts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getBestDeals(limit: number) {
+    let products = await this.prisma.product.findMany({
+      take: limit,
+      include: {
+        category: true,
+        variants: {
+          include: {
+            Inventory: { include: { discounts: true } },
+          },
+        },
+        reviews: true,
+        Favorite: true,
+        images: true,
+      },
+    });
+
+    products = products.sort(() => Math.random() - 0.5);
+
+    const formattedProducts = products.map((product) => ({
+      price: product.variants[0]?.Inventory[0]?.price || 0,
+      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
+      updatedAt: product.updatedAt,
+      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
+      name: product.name,
+      image: product.images.find(
+        (image) => image.color === product.variants[0]?.color,
+      )
+        ? product.images.filter(
+            (image) => image.color === product.variants[0]?.color,
+          )[0].url
+        : product.images[0]?.url || null,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      color: product.variants[0]?.color,
+      size: product.variants[0]?.size,
+      productId: product.id,
+    }));
+
+    return formattedProducts;
+  }
+
+  async getLatestProducts(limit: number) {
+    let products = await this.prisma.product.findMany({
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: true,
+        variants: {
+          include: {
+            Inventory: { include: { discounts: true } },
+          },
+        },
+        reviews: true,
+        Favorite: true,
+        images: true,
+      },
+    });
+
+    products = products.sort(() => Math.random() - 0.5);
+
+    const formattedProducts = products.map((product) => ({
+      price: product.variants[0]?.Inventory[0]?.price || 0,
+      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
+      updatedAt: product.updatedAt,
+      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
+      name: product.name,
+      image: product.images.find(
+        (image) => image.color === product.variants[0]?.color,
+      )
+        ? product.images.filter(
+            (image) => image.color === product.variants[0]?.color,
+          )[0].url
+        : product.images[0]?.url || null,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      color: product.variants[0]?.color,
+      size: product.variants[0]?.size,
+      productId: product.id,
+    }));
+
+    return formattedProducts;
+  }
+
+  async getRelatedProducts(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+    const where: any = {
+      id: { not: id },
+      OR: [
+        { categoryId: product.categoryId },
+        { tags: { hasSome: product.tags } },
+      ],
+    };
+    const relatedProducts = await this.prisma.product.findMany({
+      where,
+      take: 10,
+      include: {
+        variants: {
+          include: {
+            Inventory: {
+              include: {
+                discounts: true,
+              },
+            },
+          },
+        },
+        images: true,
+        category: true,
+      },
+    });
+    const transformedProducts = relatedProducts.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      category: product.category.name,
+      tags: product.tags,
+      image: product.images[0]?.url,
+      price: product.variants[0]?.Inventory[0]?.price,
+      discounts: product.variants[0]?.Inventory[0]?.discounts,
+      variants: product.variants.map((variant) => ({
+        color: variant.color,
+        size: variant.size,
+        quantity: variant.Inventory[0]?.quantity,
+      })),
+    }));
+
+    return transformedProducts;
   }
 
   async getFavoriteProducts(
@@ -418,7 +546,8 @@ export class ProductsService {
           include: {
             Inventory: {
               include: {
-                Sale: true,
+                SaleItem: true,
+                discounts: true,
               },
             },
           },
@@ -431,7 +560,7 @@ export class ProductsService {
       const variantSold = variant.Inventory.reduce(
         (variantTotal, inventory) => {
           // Sum the quantity of items sold from the related Sales
-          const quantitySold = inventory.Sale.reduce((saleTotal, sale) => {
+          const quantitySold = inventory.SaleItem.reduce((saleTotal, sale) => {
             return saleTotal + sale.quantity;
           }, 0);
           return variantTotal + quantitySold;
@@ -444,58 +573,6 @@ export class ProductsService {
       ...product,
       soldQuantity,
     };
-  }
-
-  async getRelatedProducts(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: { category: true },
-    });
-
-    if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-    const where: any = {
-      id: { not: id },
-      OR: [
-        { categoryId: product.categoryId },
-        { tags: { hasSome: product.tags } },
-      ],
-    };
-    const relatedProducts = await this.prisma.product.findMany({
-      where,
-      take: 10,
-      include: {
-        variants: {
-          include: {
-            Inventory: {
-              include: {
-                discounts: true,
-              },
-            },
-          },
-        },
-        images: true,
-        category: true,
-      },
-    });
-    const transformedProducts = relatedProducts.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      category: product.category.name,
-      tags: product.tags,
-      image: product.images[0]?.url,
-      price: product.variants[0]?.Inventory[0]?.price,
-      discounts: product.variants[0]?.Inventory[0]?.discounts,
-      variants: product.variants.map((variant) => ({
-        color: variant.color,
-        size: variant.size,
-        quantity: variant.Inventory[0]?.quantity,
-      })),
-    }));
-
-    return transformedProducts;
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
@@ -549,67 +626,6 @@ export class ProductsService {
         'An error occurred while removing the product.',
       );
     }
-  }
-
-  async getBestDeals(limit: number) {
-    const where: any = {};
-    const inventories = await this.prisma.inventory.findMany({
-      where,
-      take: limit,
-      include: {
-        variant: {
-          include: {
-            product: {
-              include: {
-                category: true,
-                variants: true,
-                reviews: true,
-                Favorite: true,
-                images: true,
-              },
-            },
-          },
-        },
-        discounts: true,
-      },
-    });
-    inventories.sort((a, b) => b.discounts.length - a.discounts.length);
-    const products = inventories.map(
-      ({ variant, price, quantity, updatedAt, discounts }) => ({
-        price,
-        quantity,
-        updatedAt,
-        discounts,
-        name: variant.product.name,
-        image: variant.product.images.find(
-          (image) => image.color === variant.color,
-        )
-          ? variant.product.images.filter(
-              (image) => image.color === variant.color,
-            )[0].url
-          : variant.product.images[0].url,
-        description: variant.product.description,
-        category: variant.product.category.name,
-        tags: variant.product.tags,
-        color: variant.color,
-        size: variant.size,
-        productId: variant.productId,
-      }),
-    );
-
-    return products;
-  }
-
-  async getLatestProducts(limit: number) {
-    return this.prisma.product.findMany({
-      take: limit,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        variants: true,
-      },
-    });
   }
 
   async createCategory(createCategoryDto: CreateCategoryDto) {

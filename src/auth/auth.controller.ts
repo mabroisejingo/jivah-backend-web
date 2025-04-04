@@ -22,9 +22,6 @@ import { Request } from 'express';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
-import { LogoutDto } from './dto/logout.dto';
-import { VerifyDto } from './dto/verify.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh.dto';
 
 @ApiTags('Auth')
@@ -36,16 +33,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Invalid data' })
-  async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
-    return this.authService.register(registerDto, req);
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
   @Post('login')
   @ApiOperation({ summary: 'Login a user' })
   @ApiResponse({ status: 200, description: 'User logged in successfully' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() credentials: LoginDto, @Req() req: Request) {
-    return this.authService.login(credentials, req);
+  async login(@Body() credentials: LoginDto) {
+    return this.authService.login(credentials);
   }
 
   @Post('refresh')

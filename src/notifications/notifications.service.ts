@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -50,5 +51,28 @@ export class NotificationsService {
       where: { userId, read: false },
       data: { read: true },
     });
+  }
+
+  async createNotification(
+    userIds: string[],
+    title: string,
+    message: string,
+    type: NotificationType = NotificationType.INFO,
+  ) {
+    const notifications = [];
+
+    for (const userId of userIds) {
+      const notification = await this.prisma.notification.create({
+        data: {
+          userId,
+          title,
+          message,
+          type,
+        },
+      });
+      notifications.push(notification);
+    }
+
+    return notifications;
   }
 }

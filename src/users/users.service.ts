@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -10,8 +12,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
 import { UtilsService } from '../utils/utils.service';
-import { Prisma, Role, User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @Injectable()
 export class UsersService {
@@ -39,28 +43,40 @@ export class UsersService {
     page?: number;
     limit?: number;
     search?: string;
-    role?: Role;
+    role?: 'USER' | 'EMPLOYEE';
   }): Promise<{ items: User[]; total: number; page: number; limit: number }> {
     const pageNumber = Number(params.page) || 1;
     const limitNumber = Number(params.limit) || 10;
     const search = params.search;
+    let role;
+
+    if (params.role == 'USER') {
+      role = await this.prisma.role.findFirst({
+        where: { name: params.role },
+      });
+    }
 
     const where: Prisma.UserWhereInput = {
-      role: params.role,
       deleted: false,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+      ...(role && { roleId: role.id }),
+      NOT: {
+        role: {
+          name: 'ADMIN',
+        },
+      },
     };
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { username: { contains: search, mode: 'insensitive' } },
-      ];
-    }
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
+        include: { role: true },
         skip: (pageNumber - 1) * limitNumber,
         take: limitNumber,
         orderBy: { createdAt: 'desc' },
@@ -72,9 +88,8 @@ export class UsersService {
   }
 
   async createEmployee(createEmployeeDto: CreateEmployeeDto): Promise<User> {
-    const { email, name, username, phone } = createEmployeeDto;
+    const { email, name, username, phone, roleId } = createEmployeeDto;
 
-    // Check if a user with the same username, email, or phone exists
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [{ email }, { username }, { phone }],
@@ -87,18 +102,17 @@ export class UsersService {
       );
     }
 
-    // Create the employee
     const employee = await this.prisma.user.create({
       data: {
         email,
         name,
         username,
         phone,
-        role: Role.EMPLOYEE,
+        roleId: roleId,
       },
     });
 
-    // Create a token for password setup
+    // Generate a password setup token
     const token = await this.utils.createToken(
       { id: employee.id.toString(), email: employee.email },
       { expiresIn: '7d' },
@@ -113,7 +127,7 @@ export class UsersService {
       },
     });
 
-    // Send account setup email with the token
+    // Send account setup email
     await this.utils.sendEmployeeAccountSetupEmails(name, token, email);
 
     return employee;
@@ -163,7 +177,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return user;
+    return { ...user, role: user.role.name };
   }
 
   async updateProfile(
@@ -289,5 +303,86 @@ export class UsersService {
       });
       return { message: 'Product added to favorites' };
     }
+  }
+
+  async createRole(createRoleDto: CreateRoleDto) {
+    const existingRole = await this.prisma.role.findUnique({
+      where: {
+        name: createRoleDto.name,
+      },
+    });
+
+    if (existingRole) {
+      throw new HttpException('Role already exists', HttpStatus.BAD_REQUEST);
+    }
+
+    return this.prisma.role.create({
+      data: createRoleDto,
+    });
+  }
+
+  async findAllRoles(page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const roles = await this.prisma.role.findMany({
+      skip,
+      take: limit,
+      where: {
+        NOT: [{ name: 'USER' }, { name: 'ADMIN' }],
+      },
+    });
+
+    const total = await this.prisma.role.count({
+      where: {
+        NOT: [{ name: 'USER' }, { name: 'ADMIN' }],
+      },
+    });
+
+    return {
+      items: roles,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findOneRole(id: string) {
+    const role = await this.prisma.role.findUnique({
+      where: { id },
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${id} not found`);
+    }
+
+    return role;
+  }
+
+  async updateRole(id: string, updateRoleDto: UpdateRoleDto) {
+    const existingRole = await this.prisma.role.findUnique({
+      where: { id },
+    });
+
+    if (!existingRole) {
+      throw new NotFoundException(`Role with ID ${id} not found`);
+    }
+
+    return this.prisma.role.update({
+      where: { id },
+      data: updateRoleDto,
+    });
+  }
+
+  async removeRole(id: string) {
+    const existingRole = await this.prisma.role.findUnique({
+      where: { id },
+    });
+
+    if (!existingRole) {
+      throw new NotFoundException(`Role with ID ${id} not found`);
+    }
+
+    return this.prisma.role.delete({
+      where: { id },
+    });
   }
 }

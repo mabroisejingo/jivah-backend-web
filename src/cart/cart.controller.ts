@@ -20,15 +20,19 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { Request } from 'express';
+import { PrivilegesGuard } from 'src/auth/privileges.guard';
+import { Privileges } from 'src/auth/privileges.decorator';
+import { Privilege } from '@prisma/client';
 
 @ApiTags('Cart')
 @Controller('cart')
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, PrivilegesGuard)
 @ApiBearerAuth()
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
   @Get()
+  @Privileges(Privilege.VIEW_CART)
   @ApiOperation({ summary: 'Get user cart' })
   @ApiResponse({ status: 200, description: 'User cart retrieved successfully' })
   async getCart(@Req() req: Request) {
@@ -37,6 +41,7 @@ export class CartController {
   }
 
   @Post('add')
+  @Privileges(Privilege.UPDATE_CART)
   @ApiOperation({ summary: 'Add item to cart' })
   @ApiResponse({ status: 201, description: 'Item added to cart successfully' })
   async addToCart(@Req() req: Request, @Body() addToCartDto: AddToCartDto) {
@@ -45,6 +50,7 @@ export class CartController {
   }
 
   @Patch('update/:itemId')
+  @Privileges(Privilege.UPDATE_CART)
   @ApiOperation({ summary: 'Update cart item quantity' })
   @ApiResponse({ status: 200, description: 'Cart item updated successfully' })
   async updateCartItem(
@@ -57,6 +63,7 @@ export class CartController {
   }
 
   @Delete('remove/:itemId')
+  @Privileges(Privilege.UPDATE_CART)
   @ApiOperation({ summary: 'Remove item from cart' })
   @ApiResponse({
     status: 200,
@@ -68,6 +75,7 @@ export class CartController {
   }
 
   @Delete('empty')
+  @Privileges(Privilege.DELETE_CART)
   @ApiOperation({ summary: 'Empty cart' })
   @ApiResponse({ status: 200, description: 'Cart emptied successfully' })
   async emptyCart(@Req() req: Request) {

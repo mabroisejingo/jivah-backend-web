@@ -9,16 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UtilsService } from '../utils/utils.service';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { LogoutDto } from './dto/logout.dto';
-import { VerifyDto } from './dto/verify.dto';
-import { Role, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { Request } from 'express';
-import { SetPasswordDto } from './dto/set-password.dto';
 import { RefreshTokenDto } from './dto/refresh.dto';
 
 @Injectable()
@@ -29,7 +24,7 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async register(registerDto: RegisterDto, req: Request) {
+  async register(registerDto: RegisterDto) {
     const { email, phone, password, name, username } = registerDto;
 
     if (!email && !phone) {
@@ -55,6 +50,10 @@ export class AuthService {
 
     const hashedPassword = await this.utils.hashPassword(password);
 
+    const userRole = await this.prisma.role.findFirst({
+      where: { name: 'USER' },
+    });
+
     const user = await this.prisma.user.create({
       data: {
         name,
@@ -62,7 +61,7 @@ export class AuthService {
         email,
         phone,
         password: hashedPassword,
-        role: Role.USER,
+        roleId: userRole.id,
       },
     });
 
@@ -90,7 +89,7 @@ export class AuthService {
     };
   }
 
-  async login(credentials: LoginDto, req: Request) {
+  async login(credentials: LoginDto) {
     const { identifier, password } = credentials;
 
     if (!identifier || !password) {
@@ -108,6 +107,7 @@ export class AuthService {
         ],
         deleted: false,
       },
+      include: { role: true },
     });
 
     if (!user) {
@@ -140,7 +140,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           username: user.username,
-          role: user.role,
+          role: user.role.name,
         },
         accessToken,
         refreshToken,
@@ -234,13 +234,16 @@ export class AuthService {
       });
 
       if (!user) {
+        const userRole = await this.prisma.role.findFirst({
+          where: { name: 'USER' },
+        });
         user = await this.prisma.user.create({
           data: {
             email: userInfo.email,
             phone: userInfo.phone,
             name: userInfo.name,
             username: userInfo.username,
-            role: Role.USER,
+            roleId: userRole.id,
           },
         });
       }
