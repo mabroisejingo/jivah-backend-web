@@ -537,7 +537,9 @@ export class ProductsService {
       where: { id },
       include: {
         images: true,
-        reviews: true,
+        reviews: {
+          include: { replies: { include: { user: true } }, user: true },
+        },
         category: true,
         variants: {
           where: {

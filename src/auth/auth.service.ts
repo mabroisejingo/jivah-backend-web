@@ -189,47 +189,26 @@ export class AuthService {
     return { name: user.name, email: user.email, phone: user.phone };
   }
 
-  // async logout(logoutDto: LogoutDto) {
-  //   const { token } = logoutDto;
-  //   if (!token) {
-  //     throw new BadRequestException('Token must be provided');
-  //   }
-  //   try {
-  //     await this.prisma.session.update({
-  //       where: {
-  //         accessToken: token
-  //       }, data: {
-  //         loggedOut: true
-  //       }
-  //     })
-  //     return { message: 'Successfully logged out' };
-  //   } catch (error) {
-  //     throw new BadRequestException(
-  //       'An error occurred while logging out. Please try again later',
-  //     );
-  //   }
-  // }
-
   async socialLogin(socialLoginDto: SocialLoginDto) {
-    const { socialToken, provider } = socialLoginDto;
-    if (!socialToken || !provider) {
-      throw new BadRequestException(
-        'Social token and provider must be provided',
-      );
+    const { token } = socialLoginDto;
+    if (!token) {
+      throw new BadRequestException('Social token must be provided');
     }
-    try {
-      const userInfo = await this.utils.verifySocialToken(
-        socialToken,
-        provider,
-      );
 
-      if (!userInfo) {
-        throw new UnauthorizedException('Invalid social token');
+    try {
+      const userInfo = await this.utils.verifySocialToken(token);
+      if (!userInfo || (!userInfo.email && !userInfo.phone)) {
+        throw new UnauthorizedException(
+          'Invalid social token or missing essential user data',
+        );
       }
 
       let user = await this.prisma.user.findFirst({
         where: {
-          OR: [{ email: userInfo.email }, { phone: userInfo.phone }],
+          OR: [
+            userInfo.email ? { email: userInfo.email } : undefined,
+            userInfo.phone ? { phone: userInfo.phone } : undefined,
+          ].filter(Boolean), // Removes undefined conditions
         },
       });
 
@@ -237,13 +216,14 @@ export class AuthService {
         const userRole = await this.prisma.role.findFirst({
           where: { name: 'USER' },
         });
+
         user = await this.prisma.user.create({
           data: {
-            email: userInfo.email,
-            phone: userInfo.phone,
-            name: userInfo.name,
-            username: userInfo.username,
-            roleId: userRole.id,
+            email: userInfo.email || null,
+            phone: userInfo.phone || null,
+            name: userInfo.name || 'Unknown User',
+            username: userInfo.name || `user_${Date.now()}`,
+            roleId: userRole?.id ?? null,
           },
         });
       }

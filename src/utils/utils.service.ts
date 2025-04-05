@@ -13,6 +13,7 @@ import { Request } from 'express';
 import * as XLSX from 'xlsx';
 import * as nodemailer from 'nodemailer';
 import { User } from '@prisma/client';
+import * as admin from 'firebase-admin';
 import {
   activateAccountTemplate,
   employeeSetPasswordEmailTemplate,
@@ -24,6 +25,7 @@ import {
 @Injectable()
 export class UtilsService {
   private smtpTransport;
+  private firebaseApp: admin.app.App;
   constructor(
     private readonly prisma: PrismaService,
     // private usersService: UsersService,
@@ -39,6 +41,15 @@ export class UtilsService {
         user: this.config.get<string>('SMTP_EMAIL'),
         pass: this.config.get<string>('SMTP_PASSWORD'),
       },
+    });
+    this.firebaseApp = admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: this.config.get<string>('FIREBASE_PROJECT_ID'),
+        privateKey: this.config
+          .get<string>('FIREBASE_PRIVATE_KEY')
+          .replace(/\\n/g, '\n'),
+        clientEmail: this.config.get<string>('FIREBASE_CLIENT_EMAIL'),
+      }),
     });
   }
 
@@ -65,21 +76,8 @@ export class UtilsService {
     }
   };
 
-  async verifySocialToken(socialToken: string, provider: string) {
-    try {
-      let userInfo;
-      if (provider === 'google') {
-        // userInfo = await this.googleAuthService.verifyToken(socialToken);
-      } else if (provider === 'facebook') {
-        // userInfo = await this.facebookAuthService.verifyToken(socialToken);
-      }
-      if (!userInfo) {
-        throw new UnauthorizedException('Invalid social token');
-      }
-      return userInfo;
-    } catch (error) {
-      throw new UnauthorizedException('Error verifying social token');
-    }
+  async verifySocialToken(token: string) {
+    return this.firebaseApp.auth().verifyIdToken(token);
   }
 
   async createToken(

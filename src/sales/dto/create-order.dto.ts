@@ -39,8 +39,8 @@ class SaleClientDto {
 
   @ApiProperty({ description: 'Client phone number' })
   @IsString()
-  @IsNotEmpty()
-  phone: string;
+  @IsOptional()
+  phone?: string;
 
   @ApiProperty({ description: 'Client address' })
   @IsString()

@@ -26,6 +26,7 @@ model User {
   Token         Token[]
   Notification  Notification[]
   roleId        String
+  ReviewReply   ReviewReply[]
 }
 
 model Role {
@@ -178,14 +179,26 @@ model CartItem {
 }
 
 model Review {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   userId    String
   productId String
+  image     String?
   rating    Int
   comment   String?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id])
+  product   Product       @relation(fields: [productId], references: [id])
+  replies   ReviewReply[] // New relation to replies
+}
+
+model ReviewReply {
+  id        String   @id @default(cuid())
+  userId    String
+  reviewId  String
+  comment   String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id])
+  review    Review   @relation(fields: [reviewId], references: [id])
 }
 
 model Token {
@@ -256,7 +269,7 @@ model SaleClient {
   saleId  String
   name    String
   email   String
-  phone   String
+  phone   String?
   address String?
   city    String?
   state   String?

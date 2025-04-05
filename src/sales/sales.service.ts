@@ -14,12 +14,14 @@ import {
 } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PaymentsService } from 'src/payments/payments.service';
 
 @Injectable()
 export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private notificationService: NotificationsService,
+    private paymentService: PaymentsService,
   ) {}
 
   async create(createSaleDto: CreateSaleDto): Promise<Sale> {
@@ -82,7 +84,7 @@ export class SalesService {
     return sale;
   }
 
-  async createOrder(createOrderDto: CreateOrderDto): Promise<Sale> {
+  async createOrder(createOrderDto: CreateOrderDto): Promise<any> {
     await Promise.all(
       createOrderDto.items.map(async (item) => {
         const inventory = await this.prisma.inventory.findUnique({
@@ -154,6 +156,8 @@ export class SalesService {
       });
     }
 
+    // const paymentToken = await this.paymentService.initiatePayment(sale.id);
+    // return { sale, paymentToken };
     return sale;
   }
 
@@ -284,6 +288,7 @@ export class SalesService {
         skip,
         take: limit,
         include: {
+          saleClient: true,
           items: {
             include: {
               inventory: {
@@ -407,6 +412,10 @@ export class SalesService {
                       product: {
                         include: {
                           images: true,
+                          reviews: {
+                            where: { userId: user.id },
+                            include: { replies: true },
+                          },
                         },
                       },
                     },
@@ -514,6 +523,7 @@ export class SalesService {
   async setOrderToDelivering(id: string): Promise<Sale> {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
+      include: { saleClient: true },
     });
 
     if (!sale) {
@@ -536,12 +546,32 @@ export class SalesService {
       },
     });
 
+    const title = 'Your Order is Now Being Delivered';
+    const notificationMessage = `
+        <p>Dear ${sale.saleClient[0].name},</p>
+        <p>Your order with Order ID: <strong>${sale.id}</strong> is now being delivered.</p>
+        <p>We are working hard to deliver your items. Please keep an eye out for the delivery.</p>
+        <p>Thank you for choosing us!</p>
+      `;
+
+    const userToNotify = await this.prisma.user.findUnique({
+      where: { email: sale.saleClient[0]?.email },
+    });
+    const usersToNotify = [userToNotify.id];
+    await this.notificationService.createNotification(
+      usersToNotify,
+      title,
+      notificationMessage,
+      NotificationType.INFO, // You can change the notification type
+    );
+
     return updatedSale;
   }
 
   async setOrderToCompleted(id: string): Promise<Sale> {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
+      include: { saleClient: true },
     });
 
     if (!sale) {
@@ -563,6 +593,23 @@ export class SalesService {
         status: SaleStatus.COMPLETED,
       },
     });
+    const title = 'Your Order Has Been Completed';
+    const notificationMessage = `
+        <p>Dear ${sale.saleClient[0].name},</p>
+        <p>We are pleased to inform you that your order with Order ID: <strong>${sale.id}</strong> has been completed successfully.</p>
+        <p>Thank you for shopping with us. We hope to serve you again soon!</p>
+      `;
+
+    const userToNotify = await this.prisma.user.findUnique({
+      where: { email: sale.saleClient[0]?.email },
+    });
+    const usersToNotify = [userToNotify.id];
+    await this.notificationService.createNotification(
+      usersToNotify,
+      title,
+      notificationMessage,
+      NotificationType.SUCCESS,
+    );
 
     return updatedSale;
   }

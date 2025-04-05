@@ -177,7 +177,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return { ...user, role: user.role.name };
+    return { ...user, role: user.role.name, privileges: user.role.privileges };
   }
 
   async updateProfile(

@@ -16,6 +16,9 @@ export async function seedRoles(prisma: PrismaClient) {
         Privilege.VIEW_CART,
         Privilege.UPDATE_CART,
         Privilege.DELETE_CART,
+        Privilege.VIEW_NOTIFICATIONS,
+        Privilege.UPDATE_NOTIFICATIONS,
+        Privilege.DELETE_NOTIFICATIONS,
       ],
     },
     {

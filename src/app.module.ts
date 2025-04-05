@@ -12,6 +12,8 @@ import { CartModule } from './cart/cart.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SalesModule } from './sales/sales.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     SalesModule,
     NotificationsModule,
     DashboardModule,
+    PaymentsModule,
+    ReviewsModule,
   ],
   controllers: [],
   providers: [PrismaService],
