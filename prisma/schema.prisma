@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  username      String?        @unique
+  email         String?        @unique
+  emailVerified Boolean        @default(false)
+  phoneVerified Boolean        @default(false)
+  phone         String?        @unique
+  password      String?
+  role          Role           @relation(fields: [roleId], references: [id])
+  deleted       Boolean        @default(false)
+  favorites     Favorite[]
+  cartItems     CartItem[]
+  reviews       Review[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  Token         Token[]
+  Notification  Notification[]
+  roleId        String
+  ReviewReply   ReviewReply[]
+}
+
+model Role {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  privileges Privilege[]
+  User       User[]
+}
+
+enum Privilege {
+  VIEW_PRODUCTS
+  CREATE_PRODUCTS
+  UPDATE_PRODUCTS
+  DELETE_PRODUCTS
+  VIEW_ORDERS
+  CREATE_ORDERS
+  UPDATE_ORDERS
+  DELETE_ORDERS
+  VIEW_USERS
+  CREATE_EMPLOYEES
+  UPDATE_EMPLOYEES
+  DELETE_USERS
+  VIEW_CATEGORIES
+  CREATE_CATEGORIES
+  UPDATE_CATEGORIES
+  DELETE_CATEGORIES
+  VIEW_ROLES
+  CREATE_ROLES
+  UPDATE_ROLES
+  DELETE_ROLES
+  VIEW_REVIEWS
+  EDIT_REVIEWS
+  CREATE_REVIEW
+  DELETE_REVIEWS
+  DELETE_INVENTORY
+  VIEW_INVENTORY
+  UPDATE_INVENTORY
+  CREATE_INVENTORY
+  VIEW_DISCOUNTS
+  CREATE_DISCOUNTS
+  UPDATE_DISCOUNTS
+  DELETE_DISCOUNTS
+  VIEW_SALES
+  CREATE_SALES
+  UPDATE_SALES
+  DELETE_SALES
+  VIEW_NOTIFICATIONS
+  CREATE_NOTIFICATIONS
+  UPDATE_NOTIFICATIONS
+  DELETE_NOTIFICATIONS
+  ADD_FAVORITES
+  VIEW_FAVORITES
+  DELETE_FAVORITES
+  VIEW_CART
+  UPDATE_CART
+  DELETE_CART
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  description String
+  images      ProductImage[]
+  variants    ProductVariant[]
+  reviews     Review[]
+  categoryId  String?
+  category    Category?        @relation(fields: [categoryId], references: [id])
+  tags        String[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deleted     Boolean          @default(false)
+  Favorite    Favorite[]
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  image     String?
+  parentId  String?
+  parent    Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children  Category[] @relation("SubCategories")
+  products  Product[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  color     String?
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model ProductVariant {
+  id        String      @id @default(cuid())
+  productId String
+  color     String
+  size      String
+  deleted   Boolean     @default(false)
+  product   Product     @relation(fields: [productId], references: [id])
+  Inventory Inventory[]
+}
+
+model Discount {
+  id          String    @id @default(cuid())
+  inventoryId String
+  percentage  Float     @default(0.0)
+  startDate   DateTime
+  endDate     DateTime
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Inventory {
+  id        String         @id @default(cuid())
+  variantId String
+  quantity  Int            @default(0)
+  price     Float
+  updatedAt DateTime       @updatedAt
+  barcode   String?
+  discounts Discount[]
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  CartItem  CartItem[]
+  createdAt DateTime       @default(now())
+  deleted   Boolean        @default(false)
+  SaleItem  SaleItem[]
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CartItem {
+  id          String    @id @default(cuid())
+  userId      String
+  quantity    Int       @default(1)
+  user        User      @relation(fields: [userId], references: [id])
+  product     Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Review {
+  id        String        @id @default(cuid())
+  userId    String
+  productId String
+  image     String?
+  rating    Int
+  comment   String?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id])
+  product   Product       @relation(fields: [productId], references: [id])
+  replies   ReviewReply[] // New relation to replies
+}
+
+model ReviewReply {
+  id        String   @id @default(cuid())
+  userId    String
+  reviewId  String
+  comment   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  review    Review   @relation(fields: [reviewId], references: [id])
+}
+
+model Token {
+  id        String   @id @default(cuid())
+  token     String
+  type      TokeType
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TokeType {
+  PASSWORD_SET
+  PASSWORD_RESET
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  type      NotificationType
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id])
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+model Sale {
+  id             String       @id @default(cuid())
+  status         SaleStatus
+  paymentMethod  String
+  type           SaleType     @default(SALE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  items          SaleItem[]
+  saleClient     SaleClient[]
+  cancelReason   String?
+  refundReason   String?
+  refundResponse String?
+}
+
+enum SaleType {
+  SALE
+  ORDER
+}
+
+model SaleItem {
+  id          String    @id @default(cuid())
+  sale        Sale      @relation(fields: [saleId], references: [id])
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  quantity    Float
+  amount      Float
+  saleId      String
+  inventoryId String
+}
+
+model SaleClient {
+  id      String  @id @default(cuid())
+  saleId  String
+  name    String
+  email   String
+  phone   String?
+  address String?
+  city    String?
+  state   String?
+  country String?
+  Sale    Sale    @relation(fields: [saleId], references: [id])
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  DELIVERING
+  CANCELLED
+  REFUNDED
+}
