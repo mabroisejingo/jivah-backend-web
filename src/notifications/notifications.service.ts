@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
+import { UtilsService } from 'src/utils/utils.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private utils: UtilsService,
+  ) {}
 
   async getAllNotifications(
     userId: string,
@@ -57,10 +61,13 @@ export class NotificationsService {
     userIds: string[],
     title: string,
     message: string,
+    body?: string,
     type: NotificationType = NotificationType.INFO,
   ) {
     const notifications = [];
+    const deviceTokens: string[] = [];
 
+    // Create notifications in the database and collect device tokens
     for (const userId of userIds) {
       const notification = await this.prisma.notification.create({
         data: {
@@ -70,7 +77,28 @@ export class NotificationsService {
           type,
         },
       });
+
+      // Retrieve device tokens for the current user
+      const userDevices = await this.prisma.userDevice.findMany({
+        where: { userId },
+      });
+      userDevices.forEach((device) => {
+        deviceTokens.push(device.token);
+      });
+
       notifications.push(notification);
+    }
+    if (deviceTokens.length > 0) {
+      try {
+        const response = await this.utils.sendNotification(
+          deviceTokens,
+          title,
+          body || message,
+        );
+        console.log('Successfully sent notifications:', response);
+      } catch (error) {
+        console.error('Error sending notifications:', error);
+      }
     }
 
     return notifications;

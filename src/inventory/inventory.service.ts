@@ -108,7 +108,11 @@ export class InventoryService {
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
         where: { variant: { productId } },
-        include: { variant: true, discounts: true, SaleItem: true },
+        include: {
+          variant: { include: { product: true } },
+          discounts: true,
+          SaleItem: true,
+        },
         skip,
         take: limit,
       }),

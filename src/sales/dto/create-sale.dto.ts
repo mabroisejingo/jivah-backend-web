@@ -29,18 +29,18 @@ class SaleItemDto {
 class SaleClientDto {
   @ApiProperty({ description: 'Client name' })
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @IsOptional()
+  name?: string;
 
   @ApiProperty({ description: 'Client email' })
   @IsString()
-  @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({ description: 'Client phone number' })
   @IsString()
-  @IsNotEmpty()
-  phone: string;
+  @IsOptional()
+  phone?: string;
 }
 
 export class CreateSaleDto {

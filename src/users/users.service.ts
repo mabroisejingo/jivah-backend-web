@@ -231,13 +231,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
-    // Soft delete the user
     await this.prisma.user.update({
       where: { id: userId },
       data: { deleted: true },
     });
-
+    await this.utils.sendDeactivationEmail(user);
     return { message: 'Account deleted successfully' };
   }
 

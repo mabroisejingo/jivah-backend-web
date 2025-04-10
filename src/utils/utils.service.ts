@@ -21,6 +21,7 @@ import {
   newDeviceLoginTemplate,
   welcomeEmailTemplate,
 } from 'src/templates/authentication.template';
+import { accountDeactivationEmailTemplate } from 'src/templates/user.template';
 
 @Injectable()
 export class UtilsService {
@@ -78,6 +79,27 @@ export class UtilsService {
 
   async verifySocialToken(token: string) {
     return this.firebaseApp.auth().verifyIdToken(token);
+  }
+
+  async sendNotification(tokens: string[], title: string, message: string) {
+    const messagePayload = {
+      notification: {
+        title,
+        body: message,
+      },
+    };
+
+    try {
+      const results = await Promise.all(
+        tokens.map((token) =>
+          admin.messaging().send({ ...messagePayload, token }),
+        ),
+      );
+      console.log('Successfully sent messages:', results);
+      return results;
+    } catch (error) {
+      console.error('Error sending messages:', error);
+    }
   }
 
   async createToken(
@@ -172,6 +194,13 @@ export class UtilsService {
     const emailHtml = activateAccountTemplate(otp, type);
     const subject =
       type == 'password-set' ? 'Reset Password' : 'Activate Your jivah Account';
+    await this.sendEmail(user.email, emailHtml, subject);
+  }
+
+  async sendDeactivationEmail(user: User) {
+    const emailHtml = accountDeactivationEmailTemplate(user.name);
+    const subject =
+      'Your Jivah Account Has Been Deactivated by Jivah Collections Team';
     await this.sendEmail(user.email, emailHtml, subject);
   }
 

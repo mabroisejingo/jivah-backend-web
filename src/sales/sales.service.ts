@@ -15,6 +15,8 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { PaymentsService } from 'src/payments/payments.service';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Injectable()
 export class SalesService {
@@ -24,7 +26,7 @@ export class SalesService {
     private paymentService: PaymentsService,
   ) {}
 
-  async create(createSaleDto: CreateSaleDto): Promise<Sale> {
+  async create(createSaleDto: CreateSaleDto): Promise<Blob> {
     await Promise.all(
       createSaleDto.items.map(async (item) => {
         const inventory = await this.prisma.inventory.findUnique({
@@ -77,11 +79,50 @@ export class SalesService {
       },
       include: {
         saleClient: true,
-        items: true,
+        items: {
+          include: {
+            inventory: { include: { variant: { include: { product: true } } } },
+          },
+        },
       },
     });
 
-    return sale;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Jivah Collections', 14, 20);
+    doc.setFontSize(12);
+    doc.text('Sale Receipt', 14, 30);
+    doc.text(`Sale ID: ${sale.id}`, 14, 40);
+    doc.text(`Date: ${new Date().toLocaleString()}`, 14, 50);
+
+    if (sale.saleClient) {
+      doc.text(`Client: ${sale.saleClient[0].name}`, 14, 60);
+      doc.text(`Phone: ${sale.saleClient[0].phone}`, 14, 70);
+      doc.text(`Email: ${sale.saleClient[0].email}`, 14, 80);
+    }
+
+    const itemsTable = sale.items.map((item) => [
+      item.inventory.variant.product.name,
+      item.inventory.variant.color,
+      item.inventory.variant.size,
+      item.quantity,
+      item.amount.toFixed(2),
+    ]);
+
+    autoTable(doc, {
+      head: [['Product', 'Color', 'Size', 'Quantity', 'Price']],
+      body: itemsTable,
+      startY: 90,
+      theme: 'striped',
+    });
+
+    const totalAmount = sale.items.reduce((sum, item) => sum + item.amount, 0);
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    doc.text(`Total: $${totalAmount.toFixed(2)}`, 14, finalY + 10);
+    doc.text('Thank you for shopping with us!', 14, finalY + 20);
+
+    const pdfBlob = doc.output('blob');
+    return pdfBlob;
   }
 
   async createOrder(createOrderDto: CreateOrderDto): Promise<any> {
@@ -134,7 +175,6 @@ export class SalesService {
               phone: createOrderDto.client.phone,
               address: createOrderDto.client.address,
               city: createOrderDto.client.city,
-              state: createOrderDto.client.state,
               country: createOrderDto.client.country,
             },
           },
