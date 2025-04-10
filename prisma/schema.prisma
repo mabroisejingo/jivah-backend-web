@@ -27,6 +27,16 @@ model User {
   Notification  Notification[]
   roleId        String
   ReviewReply   ReviewReply[]
+  UserDevice    UserDevice[]
+}
+
+model UserDevice {
+  id       String @id @default(cuid())
+  userId   String
+  deviceId String
+  token    String
+  platform String
+  user     User   @relation(fields: [userId], references: [id])
 }
 
 model Role {
@@ -267,17 +277,17 @@ model SaleItem {
 model SaleClient {
   id      String  @id @default(cuid())
   saleId  String
-  name    String
-  email   String
+  name    String?
+  email   String?
   phone   String?
   address String?
   city    String?
-  state   String?
   country String?
   Sale    Sale    @relation(fields: [saleId], references: [id])
 }
 
 enum SaleStatus {
+  PAYMENT_PENDING
   PENDING
   COMPLETED
   DELIVERING

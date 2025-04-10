@@ -65,6 +65,7 @@ export class AuthService {
       },
     });
 
+
     const accessToken = await this.utils.createToken(
       { id: user.id.toString(), email: user.email },
       { expiresIn: '1d' },
@@ -147,48 +148,6 @@ export class AuthService {
       },
     };
   }
-
-  async refresh(data: RefreshTokenDto, req: Request) {
-    const { refreshToken } = data;
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    if (!userAgent) {
-      throw new UnauthorizedException('Unauthorized');
-    }
-
-    const decoded = (await this.utils.verifyToken(refreshToken)) as any;
-    const user = await this.prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
-
-    const accessToken = await this.utils.createToken(
-      { id: user.id.toString(), userId: user.email },
-      { expiresIn: '1d' },
-    );
-
-    const newRefreshToken = await this.utils.createToken(
-      { id: user.id.toString(), userId: user.email },
-      { expiresIn: '7d' },
-    );
-
-    return {
-      message: 'Successfully refreshed token',
-      data: {
-        accessToken,
-        newRefreshToken,
-      },
-    };
-  }
-
-  async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    return { name: user.name, email: user.email, phone: user.phone };
-  }
-
   async socialLogin(socialLoginDto: SocialLoginDto) {
     const { token } = socialLoginDto;
     if (!token) {
@@ -256,6 +215,47 @@ export class AuthService {
         'An error occurred during social login. Please try again later',
       );
     }
+  }
+
+  async refresh(data: RefreshTokenDto, req: Request) {
+    const { refreshToken } = data;
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    if (!userAgent) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const decoded = (await this.utils.verifyToken(refreshToken)) as any;
+    const user = await this.prisma.user.findUnique({
+      where: { id: decoded.id },
+    });
+
+    const accessToken = await this.utils.createToken(
+      { id: user.id.toString(), userId: user.email },
+      { expiresIn: '1d' },
+    );
+
+    const newRefreshToken = await this.utils.createToken(
+      { id: user.id.toString(), userId: user.email },
+      { expiresIn: '7d' },
+    );
+
+    return {
+      message: 'Successfully refreshed token',
+      data: {
+        accessToken,
+        newRefreshToken,
+      },
+    };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return { name: user.name, email: user.email, phone: user.phone };
   }
 
   async setPassword(token: string, newPassword: string): Promise<User> {

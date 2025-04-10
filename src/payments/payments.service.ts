@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SaleStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import fetch from 'node-fetch';
@@ -24,17 +24,17 @@ export class PaymentsService {
     await this.generateAccessToken();
 
     const paymentData = {
-      accountNumber: '+250798667792',
+      accountNumber: '250738828302',
       amount: '5000',
       currency: 'TZS',
-      externalId: sale.id,
-      provider: 'MTN',
+      externalId: saleId,
+      provider: 'Airtel',
     };
 
+    console.log(paymentData);
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.accessToken}`,
-      'X-API-Key': 'YourAPIKey',
     };
 
     const paymentResponse = await fetch(
@@ -50,18 +50,18 @@ export class PaymentsService {
 
     console.log(paymentJson);
 
-    if (paymentJson?.status === 'SUCCESS') {
+    if (paymentJson?.success) {
       await this.prisma.sale.update({
         where: { id: saleId },
         data: {
-          status: SaleStatus.PENDING,
+          status: SaleStatus.PAYMENT_PENDING,
         },
       });
     } else {
-      throw new Error('Payment initiation failed');
+      throw new BadRequestException('Payment initiation failed');
     }
 
-    return paymentJson?.data?.transactionId ?? 'Unknown';
+    return paymentJson?.transactionId ?? 'Unknown';
   }
 
   async handlePaymentCallback(

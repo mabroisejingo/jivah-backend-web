@@ -8,19 +8,19 @@ import {
   Query,
   Req,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { Privilege, Sale } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { JwtGuard } from 'src/auth/jwt.guard';
 import { PrivilegesGuard } from 'src/auth/privileges.guard';
 import { Privileges } from 'src/auth/privileges.decorator';
 
 @ApiTags('sales')
-@UseGuards(JwtGuard, PrivilegesGuard)
 @Controller('sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
@@ -31,7 +31,21 @@ export class SalesController {
     status: 201,
     description: 'The sale has been successfully created.',
   })
-  create(@Body() createSaleDto: CreateSaleDto): Promise<Sale> {
+  @UseGuards(JwtGuard, PrivilegesGuard)
+  async create(@Body() createSaleDto: CreateSaleDto, @Res() res: Response) {
+    try {
+      const reportBlob = await this.salesService.create(createSaleDto);
+      const buffer = Buffer.from(await reportBlob.arrayBuffer());
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="Reciept.pdf"',
+      );
+      res.end(buffer);
+    } catch (error) {
+      console.log(error);
+      res.status(500).send('Error generating report');
+    }
     return this.salesService.create(createSaleDto);
   }
 
@@ -47,6 +61,7 @@ export class SalesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all sales' })
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @ApiResponse({ status: 200, description: 'Return all sales.' })
   findAll(
     @Query('status') status?: string,
@@ -72,6 +87,7 @@ export class SalesController {
   }
 
   @Get('mine')
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @ApiOperation({ summary: 'Get all sales for the current user' })
   @ApiResponse({
     status: 200,
@@ -105,6 +121,7 @@ export class SalesController {
 
   @Get(':id/product')
   @ApiOperation({ summary: 'Get all sales by product' })
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @ApiResponse({ status: 200, description: 'Return all sales by product.' })
   findAllByProduct(
     @Param('id') id: string,
@@ -134,6 +151,7 @@ export class SalesController {
 
   @Get(':id/id')
   @ApiOperation({ summary: 'Get a sale by id' })
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @ApiResponse({ status: 200, description: 'Return the sale.' })
   @ApiResponse({ status: 404, description: 'Sale not found.' })
   findOne(@Param('id') id: string): Promise<Sale> {
@@ -146,6 +164,7 @@ export class SalesController {
     status: 200,
     description: 'The sale has been successfully cancelled.',
   })
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @ApiResponse({ status: 404, description: 'Sale not found.' })
   remove(@Param('id') id: string): Promise<Sale> {
     return this.salesService.remove(id);
@@ -153,6 +172,7 @@ export class SalesController {
 
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancel an order' })
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @Privileges(Privilege.UPDATE_ORDERS)
   @ApiResponse({ status: 200, description: 'Order successfully canceled.' })
   @ApiResponse({ status: 404, description: 'Order not found.' })
@@ -166,6 +186,7 @@ export class SalesController {
   }
 
   @Post(':id/delivering')
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @Privileges(Privilege.UPDATE_ORDERS)
   @ApiOperation({ summary: 'Set order status to delivering' })
   @ApiResponse({
@@ -178,6 +199,7 @@ export class SalesController {
   }
 
   @Post(':id/completed')
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @Privileges(Privilege.UPDATE_ORDERS)
   @ApiOperation({ summary: 'Set order status to completed' })
   @ApiResponse({
@@ -190,6 +212,7 @@ export class SalesController {
   }
 
   @Post(':id/refund-request')
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @Privileges(Privilege.UPDATE_ORDERS)
   @ApiOperation({ summary: 'Request a refund for an order' })
   @ApiResponse({
@@ -206,6 +229,7 @@ export class SalesController {
   }
 
   @Post(':id/complete-refund')
+  @UseGuards(JwtGuard, PrivilegesGuard)
   @Privileges(Privilege.UPDATE_ORDERS)
   @ApiOperation({ summary: 'Complete refund for an order' })
   @ApiResponse({

@@ -520,7 +520,7 @@ export class ProductsService {
         quantity: Inventory[0]?.quantity || 0,
       })),
       reviewsCount: product.reviews.length,
-      isFavorite: true,
+      isFavorited: true,
     }));
 
     return {

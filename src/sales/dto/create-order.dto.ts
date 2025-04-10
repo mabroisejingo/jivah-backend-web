@@ -52,11 +52,6 @@ class SaleClientDto {
   @IsNotEmpty()
   city: string;
 
-  @ApiProperty({ description: 'Client state' })
-  @IsString()
-  @IsNotEmpty()
-  state: string;
-
   @ApiProperty({ description: 'Client country' })
   @IsString()
   @IsNotEmpty()
