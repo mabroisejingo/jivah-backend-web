@@ -16,7 +16,7 @@ RUN npm install --force
 COPY prisma ./prisma
 
 # Run Prisma commands (this will now have access to DATABASE_URL from the environment variables)
-RUN npx prisma db push
+RUN npx prisma db push --accept-data-loss
 
 # Copy the entire application
 COPY . .
