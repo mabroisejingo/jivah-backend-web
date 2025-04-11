@@ -275,16 +275,18 @@ model SaleItem {
 }
 
 model SaleClient {
-  id      String  @id @default(cuid())
-  saleId  String
-  name    String?
-  email   String?
-  phone   String?
-  address String?
-  city    String?
-  country String?
-  Sale    Sale    @relation(fields: [saleId], references: [id])
+  id              String          @id @default(cuid())
+  saleId          String
+  name            String?
+  email           String?
+  phone           String?
+  address         String?
+  city            String?
+  country         String?
+  paymentInfo Json?
+  Sale            Sale            @relation(fields: [saleId], references: [id])
 }
+
 
 enum SaleStatus {
   PAYMENT_PENDING

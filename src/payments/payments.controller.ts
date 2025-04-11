@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Query } from '@nestjs/common';
+import { Controller, Post, Param, Body } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
@@ -12,16 +12,8 @@ export class PaymentsController {
   }
 
   @Post('callback')
-  async handlePaymentCallback(
-    @Query('transactionId') transactionId: string,
-    @Query('saleId') saleId: string,
-    @Query('status') status: string,
-  ) {
-    await this.paymentsService.handlePaymentCallback(
-      transactionId,
-      saleId,
-      status,
-    );
-    return { success: true };
+  async handlePaymentCallback(@Body() requestBody: any) {
+    console.log(requestBody);
+    await this.paymentsService.handlePaymentCallback(requestBody);
   }
 }

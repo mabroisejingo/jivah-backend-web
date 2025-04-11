@@ -65,7 +65,6 @@ export class AuthService {
       },
     });
 
-
     const accessToken = await this.utils.createToken(
       { id: user.id.toString(), email: user.email },
       { expiresIn: '1d' },
@@ -262,7 +261,7 @@ export class AuthService {
     const decodedToken: any = await this.utils.verifyToken(token);
 
     if (!decodedToken || !decodedToken.id) {
-      throw new Error('Invalid or expired token');
+      throw new BadRequestException('Invalid or expired token');
     }
 
     const user = await this.prisma.user.findUnique({

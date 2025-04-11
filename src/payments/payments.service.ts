@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SaleStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import fetch from 'node-fetch';
@@ -16,22 +20,34 @@ export class PaymentsService {
     });
 
     if (!sale) {
-      throw new Error('Sale not found');
+      throw new NotFoundException('Sale not found');
     }
 
-    console.log(sale);
-
     await this.generateAccessToken();
+    const rawPaymentInfo = sale.saleClient[0].paymentInfo || '{}';
+    let paymentInfo;
+
+    try {
+      paymentInfo =
+        typeof rawPaymentInfo === 'string'
+          ? JSON.parse(rawPaymentInfo)
+          : rawPaymentInfo;
+    } catch (error) {
+      throw new BadRequestException('Invalid payment info format');
+    }
+
+    if (!paymentInfo.accountNumber) {
+      throw new BadRequestException('Please provide the payment info');
+    }
 
     const paymentData = {
-      accountNumber: '250738828302',
+      accountNumber: paymentInfo.accountNumber,
       amount: '5000',
       currency: 'TZS',
       externalId: saleId,
       provider: 'Airtel',
     };
 
-    console.log(paymentData);
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.accessToken}`,
@@ -55,43 +71,45 @@ export class PaymentsService {
         where: { id: saleId },
         data: {
           status: SaleStatus.PAYMENT_PENDING,
+          saleClient: {
+            update: {
+              where: { id: sale.saleClient[0].id },
+              data: {
+                paymentInfo: JSON.stringify({
+                  ...paymentInfo,
+                  paymentId: paymentJson.transactionId,
+                }),
+              },
+            },
+          },
         },
       });
     } else {
-      throw new BadRequestException('Payment initiation failed');
+      throw new BadRequestException(paymentJson.message);
     }
 
     return paymentJson?.transactionId ?? 'Unknown';
   }
 
-  async handlePaymentCallback(
-    transactionId: string,
-    saleId: string,
-    status: string,
-  ): Promise<void> {
+  async handlePaymentCallback(requestBody: any): Promise<void> {
+    const saleId = requestBody.utilityref;
+
+    if (requestBody.transactionstatus != 'success') return;
+
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
     });
 
     if (!sale) {
-      throw new Error('Sale not found');
+      throw new BadRequestException('Sale not found');
     }
 
-    if (status === 'SUCCESS') {
-      await this.prisma.sale.update({
-        where: { id: saleId },
-        data: {
-          status: SaleStatus.COMPLETED,
-        },
-      });
-    } else if (status === 'FAILED') {
-      await this.prisma.sale.update({
-        where: { id: saleId },
-        data: {
-          status: SaleStatus.CANCELLED,
-        },
-      });
-    }
+    await this.prisma.sale.update({
+      where: { id: saleId },
+      data: {
+        status: SaleStatus.PENDING,
+      },
+    });
   }
 
   private async generateAccessToken(): Promise<void> {
@@ -120,7 +138,7 @@ export class PaymentsService {
     if (tokenJson?.data?.accessToken) {
       this.accessToken = tokenJson.data.accessToken;
     } else {
-      throw new Error('Failed to get access token');
+      throw new BadRequestException('Failed to get access token');
     }
   }
 }

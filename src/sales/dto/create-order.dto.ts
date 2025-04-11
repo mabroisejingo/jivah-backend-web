@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsArray,
   ValidateNested,
+  IsObject,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -76,4 +77,12 @@ export class CreateOrderDto {
   @ValidateNested()
   @Type(() => SaleClientDto)
   client?: SaleClientDto;
+
+  @ApiProperty({
+    description: 'Payment information in JSON format',
+    type: Object,
+    required: true,
+  })
+  @IsObject()
+  paymentInfo: Record<string, any>;
 }

@@ -97,7 +97,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new Error(
+      throw new BadRequestException(
         'User with the same email, username, or phone already exists',
       );
     }
