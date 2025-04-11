@@ -157,7 +157,7 @@ export class SalesService {
 
     const sale = await this.prisma.sale.create({
       data: {
-        status: SaleStatus.PENDING,
+        status: SaleStatus.PAYMENT_PENDING,
         paymentMethod: 'IREMBO_PAY',
         type: SaleType.ORDER,
         items: {
@@ -176,6 +176,7 @@ export class SalesService {
               address: createOrderDto.client.address,
               city: createOrderDto.client.city,
               country: createOrderDto.client.country,
+              paymentInfo: createOrderDto.paymentInfo,
             },
           },
         }),
@@ -195,9 +196,7 @@ export class SalesService {
         },
       });
     }
-
-    // const paymentToken = await this.paymentService.initiatePayment(sale.id);
-    // return { sale, paymentToken };
+    await this.paymentService.initiatePayment(sale.id);
     return sale;
   }
 
