@@ -213,108 +213,131 @@ export class ProductsService {
         const user = await this.prisma.user.findUnique({
           where: { id: decoded.id },
         });
-        if (user) {
-          userId = user.id;
-        }
+        if (user) userId = user.id;
       }
-    } catch (error) {
-      console.warn(
-        'Token verification failed or user not found. Continuing without user ID.',
-      );
-    }
+    } catch {}
 
     const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
     const skip = (page - 1) * limit;
-    const where: any = {};
+
+    const where: any = {
+      deleted: false,
+      price: {},
+      variant: {
+        deleted: false,
+        product: {
+          deleted: false,
+        },
+      },
+    };
 
     if (filters) {
-      if (filters.minPrice || filters.maxPrice) {
-        where.variants = {
-          some: {
-            Inventory: {
-              some: {
-                price: { gte: filters.minPrice, lte: filters.maxPrice },
+      if (filters.minPrice !== undefined) where.price.gte = filters.minPrice;
+      if (filters.maxPrice !== undefined) where.price.lte = filters.maxPrice;
+
+      if (filters.colors) {
+        where.variant.color = { in: filters.colors };
+      }
+
+      if (filters.sizes) {
+        where.variant.size = { in: filters.sizes };
+      }
+
+      if (filters.category) {
+        where.variant.product.category = { name: filters.category };
+      }
+
+      if (filters.search) {
+        where.OR = [
+          {
+            variant: {
+              product: {
+                name: { contains: filters.search, mode: 'insensitive' },
               },
             },
           },
-        };
-      }
-      if (filters.colors)
-        where.variants = { some: { color: { in: filters.colors } } };
-      if (filters.sizes)
-        where.variants = { some: { size: { in: filters.sizes } } };
-      if (filters.category) where.category = { name: filters.category };
-      if (filters.search) {
-        where.OR = [
-          { name: { contains: filters.search, mode: 'insensitive' } },
-          { tags: { hasSome: [filters.search] } },
+          { variant: { product: { tags: { hasSome: [filters.search] } } } },
         ];
       }
     }
 
     let orderByClause: any = {};
-    if (orderBy) {
-      switch (orderBy) {
-        case 'most_popular':
-          orderByClause = { orders: { _count: 'desc' } };
-          break;
-        case 'least_popular':
-          orderByClause = { orders: { _count: 'asc' } };
-          break;
-        case 'latest':
-          orderByClause = { createdAt: 'desc' };
-          break;
-        case 'trending':
-          orderByClause = { Favorite: { _count: 'desc' } };
-          break;
-        default:
-          orderByClause = { [orderBy]: sortOrder || 'asc' };
-      }
+
+    switch (orderBy) {
+      case 'most_popular':
+        orderByClause = {
+          variant: { product: { orders: { _count: 'desc' } } },
+        };
+        break;
+      case 'least_popular':
+        orderByClause = { variant: { product: { orders: { _count: 'asc' } } } };
+        break;
+      case 'latest':
+        orderByClause = { updatedAt: 'desc' };
+        break;
+      case 'trending':
+        orderByClause = {
+          variant: { product: { Favorite: { _count: 'desc' } } },
+        };
+        break;
+      default:
+        if (orderBy) orderByClause = { [orderBy]: sortOrder || 'asc' };
     }
 
-    let products = await this.prisma.product.findMany({
+    let inventories = await this.prisma.inventory.findMany({
       where,
       skip,
       take: limit,
       orderBy: orderByClause,
       include: {
-        category: true,
-        variants: {
-          include: {
-            Inventory: { include: { discounts: true } },
+        discounts: {
+          where: {
+            startDate: { lte: new Date() },
+            endDate: { gte: new Date() },
           },
         },
-        reviews: true,
-        Favorite: userId ? { where: { userId } } : false,
-        images: true,
+        variant: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                reviews: true,
+                Favorite: userId ? { where: { userId } } : false,
+                images: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    products = products.sort(() => Math.random() - 0.5);
+    inventories = inventories.sort(() => Math.random() - 0.5);
 
-    const total = await this.prisma.product.count({ where });
+    const total = await this.prisma.inventory.count({ where });
 
-    const formattedProducts = products.map((product) => ({
-      price: product.variants[0]?.Inventory[0]?.price || 0,
-      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
-      updatedAt: product.updatedAt,
-      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
-      name: product.name,
-      image: product.images.find(
-        (image) => image.color === product.variants[0]?.color,
-      )
-        ? product.images.filter(
-            (image) => image.color === product.variants[0]?.color,
-          )[0].url
-        : product.images[0]?.url || null,
-      description: product.description,
-      category: product.category.name,
-      tags: product.tags,
-      color: product.variants[0]?.color,
-      size: product.variants[0]?.size,
-      isFavorited: product.Favorite && product.Favorite.length > 0,
-      productId: product.id,
-    }));
+    const formattedProducts = inventories.map((inv) => {
+      const product = inv.variant.product;
+      const image =
+        product.images.find((img) => img.color === inv.variant.color)?.url ||
+        product.images[0]?.url ||
+        null;
+
+      return {
+        price: inv.price,
+        quantity: inv.quantity,
+        updatedAt: inv.updatedAt,
+        discounts: inv.discounts,
+        name: product.name,
+        image,
+        description: product.description,
+        category: product.category?.name,
+        tags: product.tags,
+        color: inv.variant.color,
+        size: inv.variant.size,
+        isFavorited: product.Favorite && product.Favorite.length > 0,
+        productId: product.id,
+      };
+    });
 
     return {
       items: formattedProducts,
@@ -326,86 +349,122 @@ export class ProductsService {
   }
 
   async getBestDeals(limit: number) {
-    let products = await this.prisma.product.findMany({
+    let inventories = await this.prisma.inventory.findMany({
+      where: {
+        deleted: false,
+        variant: {
+          deleted: false,
+          product: { deleted: false },
+        },
+      },
       take: limit,
       include: {
-        category: true,
-        variants: {
-          include: {
-            Inventory: { include: { discounts: true } },
+        discounts: {
+          where: {
+            startDate: { lte: new Date() },
+            endDate: { gte: new Date() },
           },
         },
-        reviews: true,
-        Favorite: true,
-        images: true,
+        variant: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                reviews: true,
+                Favorite: true,
+                images: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    products = products.sort(() => Math.random() - 0.5);
+    inventories = inventories.sort(() => Math.random() - 0.5);
 
-    const formattedProducts = products.map((product) => ({
-      price: product.variants[0]?.Inventory[0]?.price || 0,
-      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
-      updatedAt: product.updatedAt,
-      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
-      name: product.name,
-      image: product.images.find(
-        (image) => image.color === product.variants[0]?.color,
-      )
-        ? product.images.filter(
-            (image) => image.color === product.variants[0]?.color,
-          )[0].url
-        : product.images[0]?.url || null,
-      description: product.description,
-      category: product.category.name,
-      tags: product.tags,
-      color: product.variants[0]?.color,
-      size: product.variants[0]?.size,
-      productId: product.id,
-    }));
+    const formattedProducts = inventories.map((inv) => {
+      const product = inv.variant.product;
+      const image =
+        product.images.find((img) => img.color === inv.variant.color)?.url ||
+        product.images[0]?.url ||
+        null;
+
+      return {
+        price: inv.price,
+        quantity: inv.quantity,
+        updatedAt: inv.updatedAt,
+        discounts: inv.discounts,
+        name: product.name,
+        image,
+        description: product.description,
+        category: product.category?.name,
+        tags: product.tags,
+        color: inv.variant.color,
+        size: inv.variant.size,
+        productId: product.id,
+      };
+    });
 
     return formattedProducts;
   }
 
   async getLatestProducts(limit: number) {
-    let products = await this.prisma.product.findMany({
+    let inventories = await this.prisma.inventory.findMany({
+      where: {
+        deleted: false,
+        variant: {
+          deleted: false,
+          product: { deleted: false },
+        },
+      },
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       include: {
-        category: true,
-        variants: {
-          include: {
-            Inventory: { include: { discounts: true } },
+        discounts: {
+          where: {
+            startDate: { lte: new Date() },
+            endDate: { gte: new Date() },
           },
         },
-        reviews: true,
-        Favorite: true,
-        images: true,
+        variant: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                reviews: true,
+                Favorite: true,
+                images: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    products = products.sort(() => Math.random() - 0.5);
+    inventories = inventories.sort(() => Math.random() - 0.5);
 
-    const formattedProducts = products.map((product) => ({
-      price: product.variants[0]?.Inventory[0]?.price || 0,
-      quantity: product.variants[0]?.Inventory[0]?.quantity || 0,
-      updatedAt: product.updatedAt,
-      discounts: product.variants[0]?.Inventory[0]?.discounts || [],
-      name: product.name,
-      image: product.images.find(
-        (image) => image.color === product.variants[0]?.color,
-      )
-        ? product.images.filter(
-            (image) => image.color === product.variants[0]?.color,
-          )[0].url
-        : product.images[0]?.url || null,
-      description: product.description,
-      category: product.category.name,
-      tags: product.tags,
-      color: product.variants[0]?.color,
-      size: product.variants[0]?.size,
-      productId: product.id,
-    }));
+    const formattedProducts = inventories.map((inv) => {
+      const product = inv.variant.product;
+      const image =
+        product.images.find((img) => img.color === inv.variant.color)?.url ||
+        product.images[0]?.url ||
+        null;
+
+      return {
+        price: inv.price,
+        quantity: inv.quantity,
+        updatedAt: inv.updatedAt,
+        discounts: inv.discounts,
+        name: product.name,
+        image,
+        description: product.description,
+        category: product.category?.name,
+        tags: product.tags,
+        color: inv.variant.color,
+        size: inv.variant.size,
+        productId: product.id,
+      };
+    });
 
     return formattedProducts;
   }
@@ -419,45 +478,68 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
+
     const where: any = {
-      id: { not: id },
-      OR: [
-        { categoryId: product.categoryId },
-        { tags: { hasSome: product.tags } },
-      ],
+      deleted: false,
+      variant: {
+        deleted: false,
+        product: {
+          deleted: false,
+          id: { not: id },
+          OR: [
+            { categoryId: product.categoryId },
+            { tags: { hasSome: product.tags } },
+          ],
+        },
+      },
     };
-    const relatedProducts = await this.prisma.product.findMany({
+
+    const today = new Date();
+
+    const inventories = await this.prisma.inventory.findMany({
       where,
       take: 10,
       include: {
-        variants: {
+        discounts: {
+          where: {
+            startDate: { lte: today },
+            endDate: { gte: today },
+          },
+        },
+        variant: {
           include: {
-            Inventory: {
+            product: {
               include: {
-                discounts: true,
+                category: true,
+                images: true,
               },
             },
           },
         },
-        images: true,
-        category: true,
       },
     });
-    const transformedProducts = relatedProducts.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      category: product.category.name,
-      tags: product.tags,
-      image: product.images[0]?.url,
-      price: product.variants[0]?.Inventory[0]?.price,
-      discounts: product.variants[0]?.Inventory[0]?.discounts,
-      variants: product.variants.map((variant) => ({
-        color: variant.color,
-        size: variant.size,
-        quantity: variant.Inventory[0]?.quantity,
-      })),
-    }));
+
+    const transformedProducts = inventories.map((inv) => {
+      const product = inv.variant.product;
+
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        category: product.category?.name,
+        tags: product.tags,
+        image: product.images[0]?.url,
+        price: inv.price,
+        discounts: inv.discounts,
+        variants: [
+          {
+            color: inv.variant.color,
+            size: inv.variant.size,
+            quantity: inv.quantity,
+          },
+        ],
+      };
+    });
 
     return transformedProducts;
   }

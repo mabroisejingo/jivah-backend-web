@@ -25,7 +25,7 @@ export class InventoryService {
     };
   }) {
     const { page = 1, limit = 10, orderBy, sortOrder, filters } = params;
-    const where: any = {};
+    const where: any = { deleted: false };
 
     if (filters) {
       if (filters.minPrice)
@@ -107,7 +107,7 @@ export class InventoryService {
 
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
-        where: { variant: { productId } },
+        where: { variant: { productId }, deleted: false },
         include: {
           variant: { include: { product: true } },
           discounts: true,
@@ -140,7 +140,7 @@ export class InventoryService {
 
     const [inventories, total] = await Promise.all([
       this.prisma.inventory.findMany({
-        where: { variantId },
+        where: { variantId, deleted: false },
         include: { variant: { include: { product: true } }, SaleItem: true },
         skip,
         take: limit,
@@ -167,7 +167,7 @@ export class InventoryService {
 
   async findOne(id: string) {
     const inventory = await this.prisma.inventory.findUnique({
-      where: { id },
+      where: { id, deleted: false },
       include: {
         variant: {
           include: {
@@ -192,7 +192,7 @@ export class InventoryService {
     const currentDate = new Date();
 
     const inventory = await this.prisma.inventory.findFirst({
-      where: { barcode },
+      where: { barcode, deleted: false },
       include: {
         discounts: {
           where: {
