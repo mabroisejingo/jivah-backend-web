@@ -246,7 +246,7 @@ enum NotificationType {
 }
 
 model Sale {
-  id             String       @id @default(cuid())
+  id             String       @id 
   status         SaleStatus
   paymentMethod  String
   type           SaleType     @default(SALE)

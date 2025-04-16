@@ -17,6 +17,7 @@ import { NotificationsService } from 'src/notifications/notifications.service';
 import { PaymentsService } from 'src/payments/payments.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import fetch from 'node-fetch';
 
 @Injectable()
 export class SalesService {
@@ -31,33 +32,48 @@ export class SalesService {
       createSaleDto.items.map(async (item) => {
         const inventory = await this.prisma.inventory.findUnique({
           where: { id: item.inventoryId },
-          include: { SaleItem: true },
+          include: { SaleItem: true, variant: { include: { product: true } } },
         });
-
+  
         if (!inventory) {
           throw new NotFoundException(
             `Inventory with ID ${item.inventoryId} not found`,
           );
         }
-
+  
         const totalSold = inventory.SaleItem.reduce(
           (sum, saleItem) => sum + saleItem.quantity,
           0,
         );
         const remainingStock = inventory.quantity - totalSold;
-
+  
         if (remainingStock < item.quantity) {
           throw new BadRequestException(
-            `Not enough stock for inventory ${item.inventoryId}. Only ${remainingStock} remaining.`,
+            `Not enough stock for inventory ${inventory.variant.product.name}. Only ${remainingStock} remaining.`,
           );
+          return;
         }
-
         return inventory;
       }),
     );
 
+    const latestSale = await this.prisma.sale.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    
+    let nextId: string;
+    
+    if (latestSale?.id) {
+      const numericPart = parseInt(latestSale.id.replace('SALE-', ''), 10);
+      nextId = `SALE-${String(numericPart + 1).padStart(5, '0')}`;
+    } else {
+      nextId = 'SALE-0000001';
+    } 
+  
     const sale = await this.prisma.sale.create({
       data: {
+        id:nextId,
         status: SaleStatus.COMPLETED,
         paymentMethod: createSaleDto.paymentMethod,
         items: {
@@ -86,44 +102,72 @@ export class SalesService {
         },
       },
     });
-
+  
+    const logoUrl = 'http://jivahcollections.com/assets/logo-DXKtbHx2.png';
+    const logoResponse = await fetch(logoUrl);
+    const logoBuffer = await logoResponse.buffer();
+    const logoBase64 = logoBuffer.toString('base64');
+    const logoMime = logoResponse.headers.get('content-type');
+    const logoDataUri = `data:${logoMime};base64,${logoBase64}`;
+  
     const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text('Jivah Collections', 14, 20);
-    doc.setFontSize(12);
-    doc.text('Sale Receipt', 14, 30);
-    doc.text(`Sale ID: ${sale.id}`, 14, 40);
-    doc.text(`Date: ${new Date().toLocaleString()}`, 14, 50);
-
+  
+    doc.setFontSize(8);
+  
+    const pageWidth = doc.internal.pageSize.width;
+    const padding = 14;
+    const logoWidth = 10;
+    const logoHeight = 10;
+  
+    const leftColumnX = padding;
+    const rightColumnX = pageWidth - padding - 70; // Adjusted for right column width
+  
+    doc.addImage(logoDataUri, 'PNG', leftColumnX, 10, logoWidth, logoHeight);
+    doc.text('Jivah Collections', leftColumnX + logoWidth + 5, 12);
+  
+    doc.setFontSize(6);
+    doc.text(`Sale ID: ${sale.id}`,  leftColumnX + logoWidth + 5, 18);
+    doc.text(`Date: ${new Date().toLocaleString()}`,  leftColumnX + logoWidth + 5, 24);
+  
     if (sale.saleClient) {
-      doc.text(`Client: ${sale.saleClient[0].name}`, 14, 60);
-      doc.text(`Phone: ${sale.saleClient[0].phone}`, 14, 70);
-      doc.text(`Email: ${sale.saleClient[0].email}`, 14, 80);
+      doc.text(`Client: ${sale.saleClient[0].name}`, rightColumnX, 12);
+      doc.text(`Phone: ${sale.saleClient[0].phone}`, rightColumnX, 18);
+      doc.text(`Email: ${sale.saleClient[0].email}`, rightColumnX, 24);
     }
 
-    const itemsTable = sale.items.map((item) => [
+    doc.setFontSize(8);
+doc.text('Receipt', leftColumnX + logoWidth + 5, 34);
+doc.setLineWidth(0.5);
+doc.line(leftColumnX + logoWidth + 5, 36, leftColumnX + logoWidth + 15, 36);
+  
+    const itemsTable = sale.items.map((item: any) => [
       item.inventory.variant.product.name,
       item.inventory.variant.color,
       item.inventory.variant.size,
-      item.quantity,
-      item.amount.toFixed(2),
+      item.quantity.toString(),
+      `${Math.round(item.amount)} RWF`,
     ]);
-
+  
     autoTable(doc, {
-      head: [['Product', 'Color', 'Size', 'Quantity', 'Price']],
+      head: [['Product', 'Qty', 'Price (RWF)']],
       body: itemsTable,
-      startY: 90,
+      startY: 40,
       theme: 'striped',
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [100, 100, 100] },
     });
-
-    const totalAmount = sale.items.reduce((sum, item) => sum + item.amount, 0);
-    const finalY = (doc as any).lastAutoTable.finalY || 100;
-    doc.text(`Total: $${totalAmount.toFixed(2)}`, 14, finalY + 10);
-    doc.text('Thank you for shopping with us!', 14, finalY + 20);
-
+  
+    const totalAmount = sale.items.reduce((sum: number, item: any) => sum + item.amount, 0);
+    const finalY = (doc as any).lastAutoTable.finalY || 70;
+  
+    doc.setFontSize(6);
+    doc.text(`Total: ${Math.round(totalAmount)} RWF`, 14, finalY + 6);
+    doc.text('Thank you for shopping with us!', 14, finalY + 12);
+  
     const pdfBlob = doc.output('blob');
     return pdfBlob;
   }
+  
 
   async createOrder(createOrderDto: CreateOrderDto): Promise<any> {
     await Promise.all(
@@ -155,8 +199,23 @@ export class SalesService {
       }),
     );
 
+    const latestSale = await this.prisma.sale.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    let nextId: string;
+    
+    if (latestSale?.id) {
+      const numericPart = parseInt(latestSale.id.replace('SALE-', ''), 10);
+      nextId = `SALE-${String(numericPart + 1).padStart(5, '0')}`;
+    } else {
+      nextId = 'SALE-0000001';
+    } 
+
     const sale = await this.prisma.sale.create({
       data: {
+        id:nextId,
         status: SaleStatus.PAYMENT_PENDING,
         paymentMethod: 'IREMBO_PAY',
         type: SaleType.ORDER,

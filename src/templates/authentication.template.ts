@@ -327,7 +327,7 @@ export const employeeWelcomeEmailTemplate = (name: string) => `
 </head>
 <body>
     <div class="container">
-        <img src="https://jivah-fe.vercel.app/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
+        <img src="http://jivahcollections.com/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
         <h1>Welcome to Jivah!</h1>
         <div class="content">
             <p>Dear ${name},</p>
@@ -362,7 +362,7 @@ export const employeeSetPasswordEmailTemplate = (token: string) => `
 </head>
 <body>
     <div class="container">
-        <img src="https://jivah-fe.vercel.app/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
+        <img src="http://jivahcollections.com/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
         <h1>Set Your Password</h1>
         <div class="content">
             <p>Hello,</p>
@@ -398,7 +398,7 @@ export const resetPasswordEmailTemplate = (token: string) => `
 </head>
 <body>
     <div class="container">
-        <img src="https://jivah-fe.vercel.app/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
+        <img src="http://jivahcollections.com/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
         <h1>Set Your Password</h1>
         <div class="content">
             <p>Hello,</p>
