@@ -62,7 +62,7 @@ export class PaymentsService {
       },
     );
 
-    const paymentJson = await paymentResponse.json();
+    const paymentJson:any = await paymentResponse.json();
 
     console.log(paymentJson);
 
@@ -133,7 +133,7 @@ export class PaymentsService {
       },
     );
 
-    const tokenJson = await tokenResponse.json();
+    const tokenJson:any = await tokenResponse.json();
     console.log(tokenJson);
     if (tokenJson?.data?.accessToken) {
       this.accessToken = tokenJson.data.accessToken;

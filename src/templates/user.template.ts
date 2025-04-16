@@ -16,7 +16,7 @@ export const accountDeactivationEmailTemplate = (name: string) => `
 </head>
 <body>
     <div class="container">
-        <img src="https://jivah-fe.vercel.app/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
+        <img src="http://jivahcollections.com/assets/logo-DXKtbHx2.png" alt="Jivah Logo" class="logo">
         <h1>Account Deactivation Notice</h1>
         <div class="content">
             <p>Dear ${name},</p>
