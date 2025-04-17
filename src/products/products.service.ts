@@ -348,7 +348,20 @@ export class ProductsService {
     };
   }
 
-  async getBestDeals(limit: number) {
+  async getBestDeals(limit: number,req:any) {
+    let userId: string | null = null;
+
+    try {
+      const authorization = req.headers.authorization || '';
+      const token = authorization.split(' ')[1];
+      if (token) {
+        const decoded = (await this.utils.verifyToken(token)) as any;
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.id },
+        });
+        if (user) userId = user.id;
+      }
+    } catch {}
     let inventories = await this.prisma.inventory.findMany({
       where: {
         deleted: false,
@@ -371,7 +384,7 @@ export class ProductsService {
               include: {
                 category: true,
                 reviews: true,
-                Favorite: true,
+                Favorite: userId ? { where: { userId } } : false,
                 images: true,
               },
             },
@@ -401,6 +414,7 @@ export class ProductsService {
         tags: product.tags,
         color: inv.variant.color,
         size: inv.variant.size,
+        isFavorited: product.Favorite && product.Favorite.length > 0,
         productId: product.id,
       };
     });
@@ -408,7 +422,20 @@ export class ProductsService {
     return formattedProducts;
   }
 
-  async getLatestProducts(limit: number) {
+  async getLatestProducts(limit: number,req:any) {
+    let userId: string | null = null;
+
+    try {
+      const authorization = req.headers.authorization || '';
+      const token = authorization.split(' ')[1];
+      if (token) {
+        const decoded = (await this.utils.verifyToken(token)) as any;
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.id },
+        });
+        if (user) userId = user.id;
+      }
+    } catch {}
     let inventories = await this.prisma.inventory.findMany({
       where: {
         deleted: false,
@@ -432,7 +459,7 @@ export class ProductsService {
               include: {
                 category: true,
                 reviews: true,
-                Favorite: true,
+                Favorite: userId ? { where: { userId } } : false,
                 images: true,
               },
             },
@@ -461,6 +488,7 @@ export class ProductsService {
         category: product.category?.name,
         tags: product.tags,
         color: inv.variant.color,
+        isFavorited: product.Favorite && product.Favorite.length > 0,
         size: inv.variant.size,
         productId: product.id,
       };
@@ -469,7 +497,20 @@ export class ProductsService {
     return formattedProducts;
   }
 
-  async getRelatedProducts(id: string) {
+  async getRelatedProducts(id: string,req:any) {
+    let userId: string | null = null;
+
+    try {
+      const authorization = req.headers.authorization || '';
+      const token = authorization.split(' ')[1];
+      if (token) {
+        const decoded = (await this.utils.verifyToken(token)) as any;
+        const user = await this.prisma.user.findUnique({
+          where: { id: decoded.id },
+        });
+        if (user) userId = user.id;
+      }
+    } catch {}
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: { category: true },
@@ -511,6 +552,7 @@ export class ProductsService {
             product: {
               include: {
                 category: true,
+                Favorite:userId ? { where: { userId } } : false,
                 images: true,
               },
             },
@@ -531,6 +573,7 @@ export class ProductsService {
         image: product.images[0]?.url,
         price: inv.price,
         discounts: inv.discounts,
+        isFavorited: product.Favorite && product.Favorite.length > 0,
         variants: [
           {
             color: inv.variant.color,
@@ -575,7 +618,11 @@ export class ProductsService {
             category: true,
             variants: {
               include: {
-                Inventory: true,
+                Inventory: {
+                  include:{
+                    discounts:true
+                  }
+                },
               },
             },
             images: true,
@@ -584,6 +631,8 @@ export class ProductsService {
         },
       },
     });
+
+    console.log(favorites)
 
     const total = await this.prisma.favorite.count({ where: { userId } });
 

@@ -112,24 +112,24 @@ export class ProductsController {
   @Get('best-deals')
   @ApiOperation({ summary: 'Get top best deals' })
   @ApiResponse({ status: 200, description: 'Returns the top best deals' })
-  getBestDeals(@Query('limit') limit: string) {
+  getBestDeals(@Query('limit') limit: string,@Req() req?: Request,) {
     const limitNumber = limit ? parseInt(limit, 10) : 10; // Default to 10 if not specified
-    return this.productsService.getBestDeals(limitNumber);
+    return this.productsService.getBestDeals(limitNumber,req);
   }
 
   @Get('latest')
   @ApiOperation({ summary: 'Get latest products' })
   @ApiResponse({ status: 200, description: 'Returns the latest products' })
-  getLatestProducts(@Query('limit') limit: string) {
+  getLatestProducts(@Query('limit') limit: string,@Req() req?: Request,) {
     const limitNumber = limit ? parseInt(limit, 10) : 10; // Default to 10 if not specified
-    return this.productsService.getLatestProducts(limitNumber);
+    return this.productsService.getLatestProducts(limitNumber,req);
   }
 
   @Get(':id/related')
   @ApiOperation({ summary: 'Get related products' })
   @ApiResponse({ status: 200, description: 'Returns related products' })
-  getRelatedProducts(@Param('id') id: string) {
-    return this.productsService.getRelatedProducts(id);
+  getRelatedProducts(@Param('id') id: string,@Req() req?: Request,) {
+    return this.productsService.getRelatedProducts(id,req);
   }
 
   @Get(':id/id')
