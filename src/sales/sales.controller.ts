@@ -9,6 +9,8 @@ import {
   Req,
   UseGuards,
   Res,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
@@ -37,18 +39,24 @@ export class SalesController {
     try {
       const reportBlob = await this.salesService.create(createSaleDto);
       const buffer = Buffer.from(await reportBlob.arrayBuffer());
+  
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="Reciept.pdf"',
+        'attachment; filename="Receipt.pdf"',
       );
-      res.end(buffer);
+      res.status(201).end(buffer);
     } catch (error) {
-      console.log(error);
-      res.status(500).send('Error generating report');
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        const response = error.getResponse();
+        const message = typeof response === 'string' ? response : response['message'];
+        res.status(error.getStatus()).json({ message });
+      } else {
+        res.status(500).json({ message: 'Something went wrong while creating the sale. Please try again.' });
+      }
     }
-    return this.salesService.create(createSaleDto);
   }
+  
 
   @Post('order')
   @ApiOperation({ summary: 'Create a new sale' })
