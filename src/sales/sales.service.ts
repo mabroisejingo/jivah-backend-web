@@ -419,7 +419,7 @@ doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
         );
         return {
           ...item,
-          image: filteredImage?.url || null,
+          image: filteredImage?.url || productImages[0]?.url,
         };
       }),
     }));
