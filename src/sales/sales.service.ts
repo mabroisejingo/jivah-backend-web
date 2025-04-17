@@ -28,52 +28,44 @@ export class SalesService {
   ) {}
 
   async create(createSaleDto: CreateSaleDto): Promise<Blob> {
-    await Promise.all(
-      createSaleDto.items.map(async (item) => {
-        const inventory = await this.prisma.inventory.findUnique({
-          where: { id: item.inventoryId },
-          include: { SaleItem: true, variant: { include: { product: true } } },
-        });
+    for (const item of createSaleDto.items) {
+      const inventory = await this.prisma.inventory.findUnique({
+        where: { id: item.inventoryId },
+        include: { SaleItem: true, variant: { include: { product: true } } },
+      });
   
-        if (!inventory) {
-          throw new NotFoundException(
-            `Inventory with ID ${item.inventoryId} not found`,
-          );
-        }
+      if (!inventory) {
+        throw new NotFoundException(`We couldn't find the item you selected. Please check and try again.`);
+      }
   
-        const totalSold = inventory.SaleItem.reduce(
-          (sum, saleItem) => sum + saleItem.quantity,
-          0,
+      const soldQuantities = inventory.SaleItem.map((si) => si.quantity);
+      const totalSold = soldQuantities.length > 0 ? soldQuantities.reduce((a, b) => a + b) : 0;
+      const remainingStock = inventory.quantity - totalSold;
+  
+      if (remainingStock < item.quantity) {
+        throw new BadRequestException(
+          `Oops! Only ${remainingStock} item(s) of "${inventory.variant.product.name}" are currently available.`,
         );
-        const remainingStock = inventory.quantity - totalSold;
+      }
+    }
   
-        if (remainingStock < item.quantity) {
-          throw new BadRequestException(
-            `Not enough stock for inventory ${inventory.variant.product.name}. Only ${remainingStock} remaining.`,
-          );
-          return;
-        }
-        return inventory;
-      }),
-    );
-
     const latestSale = await this.prisma.sale.findFirst({
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });
-    
+  
     let nextId: string;
-    
+  
     if (latestSale?.id) {
       const numericPart = parseInt(latestSale.id.replace('SALE-', ''), 10);
       nextId = `SALE-${String(numericPart + 1).padStart(5, '0')}`;
     } else {
       nextId = 'SALE-0000001';
-    } 
+    }
   
     const sale = await this.prisma.sale.create({
       data: {
-        id:nextId,
+        id: nextId,
         status: SaleStatus.COMPLETED,
         paymentMethod: createSaleDto.paymentMethod,
         items: {
@@ -102,70 +94,78 @@ export class SalesService {
         },
       },
     });
-  
     const logoUrl = 'http://jivahcollections.com/assets/logo-DXKtbHx2.png';
     const logoResponse = await fetch(logoUrl);
     const logoBuffer = await logoResponse.buffer();
     const logoBase64 = logoBuffer.toString('base64');
     const logoMime = logoResponse.headers.get('content-type');
     const logoDataUri = `data:${logoMime};base64,${logoBase64}`;
-  
+    
     const doc = new jsPDF();
-  
+    
     doc.setFontSize(8);
-  
-    const pageWidth = doc.internal.pageSize.width;
-    const padding = 14;
+    
+    // const pageWidth = doc.internal.pageSize.width;
+    // const maxContentWidth = 60;
+    const marginX = 10;
+    const contentStartX = marginX;
+    let currentY = 10;
+    
     const logoWidth = 10;
     const logoHeight = 10;
-  
-    const leftColumnX = padding;
-    const rightColumnX = pageWidth - padding - 70; // Adjusted for right column width
-  
-    doc.addImage(logoDataUri, 'PNG', leftColumnX, 10, logoWidth, logoHeight);
-    doc.text('Jivah Collections', leftColumnX + logoWidth + 5, 12);
-  
+    doc.addImage(logoDataUri, 'PNG', contentStartX+20, currentY, logoWidth, logoHeight);
+    currentY += logoHeight + 5 ;
+    doc.text('Jivah Collections', contentStartX , currentY );
+    currentY += 6;
     doc.setFontSize(6);
-    doc.text(`Sale ID: ${sale.id}`,  leftColumnX + logoWidth + 5, 18);
-    doc.text(`Date: ${new Date().toLocaleString()}`,  leftColumnX + logoWidth + 5, 24);
-  
-    if (sale.saleClient) {
-      doc.text(`Client: ${sale.saleClient[0].name}`, rightColumnX, 12);
-      doc.text(`Phone: ${sale.saleClient[0].phone}`, rightColumnX, 18);
-      doc.text(`Email: ${sale.saleClient[0].email}`, rightColumnX, 24);
+    doc.text(`Sale ID: ${sale.id}`, contentStartX, currentY);
+    currentY += 6;
+    doc.text(`Date: ${new Date().toLocaleString()}`, contentStartX, currentY);
+    currentY += 6;
+    
+    if (sale.saleClient[0].name) {
+      doc.text(`Client: ${sale.saleClient[0].name}`, contentStartX, currentY);
+      currentY += 6;
     }
-
+    if (sale.saleClient[0].phone) {
+      doc.text(`Client: ${sale.saleClient[0].phone}`, contentStartX, currentY);
+      currentY += 6;
+    }
+    if (sale.saleClient[0].email) {
+      doc.text(`Client: ${sale.saleClient[0].email}`, contentStartX, currentY);
+      currentY += 6;
+    }    
     doc.setFontSize(8);
-doc.text('Receipt', leftColumnX + logoWidth + 5, 34);
-doc.setLineWidth(0.5);
-doc.line(leftColumnX + logoWidth + 5, 36, leftColumnX + logoWidth + 15, 36);
-  
-    const itemsTable = sale.items.map((item: any) => [
-      item.inventory.variant.product.name,
-      item.inventory.variant.color,
-      item.inventory.variant.size,
-      item.quantity.toString(),
-      `${Math.round(item.amount)} RWF`,
-    ]);
-  
+    doc.text('Receipt', contentStartX, currentY);
+    currentY += 5;
+    
+    doc.setFontSize(6);
+    
+    const tableData = sale.items.map((item: any) => {
+      const name = item.inventory.variant.product.name;
+      const qty = item.quantity;
+      const price = Math.round(item.amount);
+      return [`${name} x ${qty}`, `${price} RWF`];
+    });
+    
     autoTable(doc, {
-      head: [['Product', 'Qty', 'Price (RWF)']],
-      body: itemsTable,
-      startY: 40,
+      head: [['Product', 'Price (RWF)']],
+      body: tableData,
+      startY: currentY,
       theme: 'striped',
       styles: { fontSize: 6, cellPadding: 2 },
       headStyles: { fillColor: [100, 100, 100] },
+      tableWidth: 50,
+      margin: { left: contentStartX },
     });
-  
+    
     const totalAmount = sale.items.reduce((sum: number, item: any) => sum + item.amount, 0);
-    const finalY = (doc as any).lastAutoTable.finalY || 70;
-  
-    doc.setFontSize(6);
-    doc.text(`Total: ${Math.round(totalAmount)} RWF`, 14, finalY + 6);
-    doc.text('Thank you for shopping with us!', 14, finalY + 12);
-  
+    const finalY = (doc as any).lastAutoTable.finalY || currentY + 10;
+doc.text(`Total: ${Math.round(totalAmount)} RWF`, contentStartX, finalY + 6);
+doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
     const pdfBlob = doc.output('blob');
     return pdfBlob;
+    
   }
   
 
