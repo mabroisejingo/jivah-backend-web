@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsNumber, Min } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
 
 export class CreateDiscountDto {
   @ApiProperty()
@@ -17,4 +17,14 @@ export class CreateDiscountDto {
   @IsNotEmpty()
   @IsDateString()
   endDate: string;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsNumber()
+  startHour?: number;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsNumber()
+  endHour?: number;
 }
