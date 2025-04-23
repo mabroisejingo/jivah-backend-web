@@ -147,6 +147,8 @@ model Discount {
   percentage  Float     @default(0.0)
   startDate   DateTime
   endDate     DateTime
+  startHour   Int?    
+  endHour     Int?
   inventory   Inventory @relation(fields: [inventoryId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

@@ -261,7 +261,7 @@ export class InventoryService {
     inventoryId: string,
     createDiscountDto: CreateDiscountDto,
   ): Promise<Discount> {
-    const { percentage, startDate, endDate } = createDiscountDto;
+    const { percentage, startDate, endDate,startHour,endHour } = createDiscountDto;
 
     const discount = await this.prisma.discount.create({
       data: {
@@ -269,6 +269,8 @@ export class InventoryService {
         percentage,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
+        startHour,
+        endHour
       },
     });
 
