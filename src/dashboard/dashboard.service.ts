@@ -70,13 +70,13 @@ export class DashboardService {
         },
       }),
       this.prisma.inventory.count({
-        where: { createdAt: { gte: startDate, lte: endDate } },
+        where: { createdAt: { gte: startDate, lte: endDate },deleted:false },
       }),
       this.prisma.saleItem.findMany({
         where: {
           sale: {
             createdAt: { gte: startDate, lte: endDate },
-            status: 'COMPLETED', // Ensure that sales are completed for inventory sold
+            status: 'COMPLETED', 
           },
         },
         select: {
@@ -89,17 +89,15 @@ export class DashboardService {
       this.prisma.sale.count({
         where: {
           createdAt: { gte: startDate, lte: endDate },
-          type: 'ORDER', // Only count orders
+          type: 'ORDER', 
         },
       }),
     ]);
 
-    // Calculate the total sales amount
     const totalSalesAmountValue = totalSalesAmount.reduce((total, saleItem) => {
       return total + saleItem.amount * saleItem.quantity;
     }, 0);
 
-    // Calculate the total quantity of items sold
     const totalQuantitySold = inventorySold.reduce((total, saleItem) => {
       return total + saleItem.quantity;
     }, 0);
@@ -163,7 +161,7 @@ export class DashboardService {
           },
         }),
         this.prisma.inventory.findMany({
-          where: { createdAt: { gte: startDate, lte: endDate } },
+          where: { createdAt: { gte: startDate, lte: endDate } ,deleted:false},
           include: {
             variant: {
               include: {
@@ -183,7 +181,8 @@ export class DashboardService {
           },
         }),
         this.prisma.product.findMany({
-          where: { createdAt: { gte: startDate, lte: endDate } },
+          where: { createdAt: { gte: startDate, lte: endDate } ,deleted:false},
+          
           include: {
             variants: true,
             category: true,
@@ -301,6 +300,7 @@ export class DashboardService {
         this.prisma.user.count({
           where: {
             createdAt: { gte: startOfMonth, lte: endOfMonth },
+            deleted:false
           },
         }),
         this.prisma.sale.count({
@@ -399,7 +399,7 @@ export class DashboardService {
     });
 
     // Sum quantities by productId
-    const productSales = saleItems.reduce((acc, saleItem) => {
+    const productSales: Record<string, { salesMade: number; productName: string }> = saleItems.reduce((acc, saleItem) => {
       const productId = saleItem.inventory.variant.productId;
       if (!acc[productId]) {
         acc[productId] = {
@@ -413,13 +413,12 @@ export class DashboardService {
 
     // Convert to array and sort by sales quantity
     const sortedSales = Object.entries(productSales)
-      //@ts-ignore
-      .map(([productId, { salesMade, productName }]) => ({
-        productId,
-        productName,
-        salesMade,
-      }))
-      .sort((a, b) => b.salesMade - a.salesMade);
+    .map(([productId, value]) => ({
+      productId,
+      productName: value.productName,
+      salesMade: value.salesMade,
+    }))
+    .sort((a, b) => b.salesMade - a.salesMade);
 
     // Return the top 10 most sold products
     return sortedSales.slice(0, 10);

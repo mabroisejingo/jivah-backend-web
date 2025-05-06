@@ -136,6 +136,7 @@ model ProductVariant {
   productId String
   color     String
   size      String
+  barcode String?
   deleted   Boolean     @default(false)
   product   Product     @relation(fields: [productId], references: [id])
   Inventory Inventory[]
@@ -160,7 +161,6 @@ model Inventory {
   quantity  Int            @default(0)
   price     Float
   updatedAt DateTime       @updatedAt
-  barcode   String?
   discounts Discount[]
   variant   ProductVariant @relation(fields: [variantId], references: [id])
   CartItem  CartItem[]

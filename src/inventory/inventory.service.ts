@@ -169,10 +169,12 @@ export class InventoryService {
     const inventory = await this.prisma.inventory.findUnique({
       where: { id, deleted: false },
       include: {
+        discounts:true,
         variant: {
           include: {
             product: {
               include: {
+                images:true,
                 category: true,
               },
             },
@@ -188,37 +190,7 @@ export class InventoryService {
     return inventory;
   }
 
-  async findOneBarcode(barcode: string) {
-    const currentDate = new Date();
 
-    const inventory = await this.prisma.inventory.findFirst({
-      where: { barcode, deleted: false },
-      include: {
-        discounts: {
-          where: {
-            startDate: { lte: currentDate }, // Discount start date should be less than or equal to today
-            endDate: { gte: currentDate }, // Discount end date should be greater than or equal to today
-          },
-        },
-        variant: {
-          include: {
-            product: {
-              include: {
-                category: true,
-                images: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!inventory) {
-      throw new NotFoundException(`No Inventory found related to the barcode`);
-    }
-
-    return inventory;
-  }
 
   async create(createInventoryDto: CreateInventoryDto) {
     const { variantId, quantity, price } = createInventoryDto;

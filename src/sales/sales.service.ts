@@ -18,6 +18,7 @@ import { PaymentsService } from 'src/payments/payments.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fetch from 'node-fetch';
+import { UtilsService } from 'src/utils/utils.service';
 
 @Injectable()
 export class SalesService {
@@ -25,6 +26,7 @@ export class SalesService {
     private readonly prisma: PrismaService,
     private notificationService: NotificationsService,
     private paymentService: PaymentsService,
+    private utilsService:UtilsService
   ) {}
 
   async create(createSaleDto: CreateSaleDto): Promise<Blob> {
@@ -94,60 +96,57 @@ export class SalesService {
         },
       },
     });
+  
     const logoUrl = 'http://jivahcollections.com/assets/logo-DXKtbHx2.png';
     const logoResponse = await fetch(logoUrl);
     const logoBuffer = await logoResponse.buffer();
     const logoBase64 = logoBuffer.toString('base64');
     const logoMime = logoResponse.headers.get('content-type');
     const logoDataUri = `data:${logoMime};base64,${logoBase64}`;
-    
+  
     const doc = new jsPDF();
-    
     doc.setFontSize(8);
-    
-    // const pageWidth = doc.internal.pageSize.width;
-    // const maxContentWidth = 60;
     const marginX = 10;
     const contentStartX = marginX;
     let currentY = 10;
-    
+  
     const logoWidth = 10;
     const logoHeight = 10;
-    doc.addImage(logoDataUri, 'PNG', contentStartX+20, currentY, logoWidth, logoHeight);
-    currentY += logoHeight + 5 ;
-    doc.text('Jivah Collections', contentStartX , currentY );
+    doc.addImage(logoDataUri, 'PNG', contentStartX + 20, currentY, logoWidth, logoHeight);
+    currentY += logoHeight + 5;
+    doc.text('Jivah Collections', contentStartX, currentY);
     currentY += 6;
     doc.setFontSize(6);
     doc.text(`Sale ID: ${sale.id}`, contentStartX, currentY);
     currentY += 6;
     doc.text(`Date: ${new Date().toLocaleString()}`, contentStartX, currentY);
     currentY += 6;
-    
-    if (sale.saleClient[0].name) {
+  
+    if (sale.saleClient[0]?.name) {
       doc.text(`Client: ${sale.saleClient[0].name}`, contentStartX, currentY);
       currentY += 6;
     }
-    if (sale.saleClient[0].phone) {
+    if (sale.saleClient[0]?.phone) {
       doc.text(`Client: ${sale.saleClient[0].phone}`, contentStartX, currentY);
       currentY += 6;
     }
-    if (sale.saleClient[0].email) {
+    if (sale.saleClient[0]?.email) {
       doc.text(`Client: ${sale.saleClient[0].email}`, contentStartX, currentY);
       currentY += 6;
-    }    
+    }
+  
     doc.setFontSize(8);
     doc.text('Receipt', contentStartX, currentY);
     currentY += 5;
-    
     doc.setFontSize(6);
-    
+  
     const tableData = sale.items.map((item: any) => {
       const name = item.inventory.variant.product.name;
       const qty = item.quantity;
       const price = Math.round(item.amount);
       return [`${name} x ${qty}`, `${price} RWF`];
     });
-    
+  
     autoTable(doc, {
       head: [['Product', 'Price (RWF)']],
       body: tableData,
@@ -158,15 +157,31 @@ export class SalesService {
       tableWidth: 50,
       margin: { left: contentStartX },
     });
-    
+  
     const totalAmount = sale.items.reduce((sum: number, item: any) => sum + item.amount, 0);
     const finalY = (doc as any).lastAutoTable.finalY || currentY + 10;
-doc.text(`Total: ${Math.round(totalAmount)} RWF`, contentStartX, finalY + 6);
-doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
+    doc.text(`Total: ${Math.round(totalAmount)} RWF`, contentStartX, finalY + 6);
+    doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
+  
     const pdfBlob = doc.output('blob');
+  
+    const receiptSummary = `Sale ID: ${sale.id}, Date: ${new Date().toLocaleString()}, Total: ${Math.round(
+      totalAmount,
+    )} RWF`;
+  
+    if (sale.saleClient[0]?.email) {
+      const user = {
+        name: sale.saleClient[0].name,
+        email: sale.saleClient[0].email,
+      };
+  
+      const receiptBuffer = await pdfBlob.arrayBuffer();
+      await this.utilsService.sendReceiptToUserAndAdmin(user, receiptSummary, Buffer.from(receiptBuffer));
+    }
+  
     return pdfBlob;
-    
   }
+  
   
 
   async createOrder(createOrderDto: CreateOrderDto): Promise<any> {
@@ -176,46 +191,44 @@ doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
           where: { id: item.inventoryId },
           include: { SaleItem: true },
         });
-
+  
         if (!inventory) {
-          throw new NotFoundException(
-            `Inventory with ID ${item.inventoryId} not found`,
-          );
+          throw new NotFoundException(`Inventory with ID ${item.inventoryId} not found`);
         }
-
+  
         const totalSold = inventory.SaleItem.reduce(
           (sum, saleItem) => sum + saleItem.quantity,
           0,
         );
         const remainingStock = inventory.quantity - totalSold;
-
+  
         if (remainingStock < item.quantity) {
           throw new BadRequestException(
             `Not enough stock for inventory ${item.inventoryId}. Only ${remainingStock} remaining.`,
           );
         }
-
+  
         return inventory;
       }),
     );
-
+  
     const latestSale = await this.prisma.sale.findFirst({
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });
-
+  
     let nextId: string;
-    
+  
     if (latestSale?.id) {
       const numericPart = parseInt(latestSale.id.replace('SALE-', ''), 10);
       nextId = `SALE-${String(numericPart + 1).padStart(5, '0')}`;
     } else {
       nextId = 'SALE-0000001';
-    } 
-
+    }
+  
     const sale = await this.prisma.sale.create({
       data: {
-        id:nextId,
+        id: nextId,
         status: SaleStatus.PAYMENT_PENDING,
         paymentMethod: 'IREMBO_PAY',
         type: SaleType.ORDER,
@@ -242,10 +255,14 @@ doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
       },
       include: {
         saleClient: true,
-        items: true,
+        items: {
+          include: {
+            inventory: { include: { variant: { include: { product: true } } } },
+          },
+        },
       },
     });
-
+  
     if (createOrderDto.client?.email) {
       await this.prisma.cartItem.deleteMany({
         where: {
@@ -255,9 +272,96 @@ doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
         },
       });
     }
+  
+    const jsPDF = (await import('jspdf')).jsPDF;
+    const autoTable = (await import('jspdf-autotable')).default;
+  
+    const logoUrl = 'http://jivahcollections.com/assets/logo-DXKtbHx2.png';
+    const logoResponse = await fetch(logoUrl);
+    const logoBuffer = await logoResponse.buffer();
+    const logoBase64 = logoBuffer.toString('base64');
+    const logoMime = logoResponse.headers.get('content-type');
+    const logoDataUri = `data:${logoMime};base64,${logoBase64}`;
+  
+    const doc = new jsPDF();
+    doc.setFontSize(8);
+    const marginX = 10;
+    const contentStartX = marginX;
+    let currentY = 10;
+  
+    const logoWidth = 10;
+    const logoHeight = 10;
+    doc.addImage(logoDataUri, 'PNG', contentStartX + 20, currentY, logoWidth, logoHeight);
+    currentY += logoHeight + 5;
+    doc.text('Jivah Collections', contentStartX, currentY);
+    currentY += 6;
+    doc.setFontSize(6);
+    doc.text(`Order ID: ${sale.id}`, contentStartX, currentY);
+    currentY += 6;
+    doc.text(`Date: ${new Date().toLocaleString()}`, contentStartX, currentY);
+    currentY += 6;
+  
+    if (sale.saleClient[0]?.name) {
+      doc.text(`Client: ${sale.saleClient[0].name}`, contentStartX, currentY);
+      currentY += 6;
+    }
+    if (sale.saleClient[0]?.phone) {
+      doc.text(`Client: ${sale.saleClient[0].phone}`, contentStartX, currentY);
+      currentY += 6;
+    }
+    if (sale.saleClient[0]?.email) {
+      doc.text(`Client: ${sale.saleClient[0].email}`, contentStartX, currentY);
+      currentY += 6;
+    }
+  
+    doc.setFontSize(8);
+    doc.text('Order Summary', contentStartX, currentY);
+    currentY += 5;
+    doc.setFontSize(6);
+  
+    const tableData = sale.items.map((item: any) => {
+      const name = item.inventory.variant.product.name;
+      const qty = item.quantity;
+      const price = Math.round(item.amount);
+      return [`${name} x ${qty}`, `${price} RWF`];
+    });
+  
+    autoTable(doc, {
+      head: [['Product', 'Price (RWF)']],
+      body: tableData,
+      startY: currentY,
+      theme: 'striped',
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [100, 100, 100] },
+      tableWidth: 50,
+      margin: { left: contentStartX },
+    });
+  
+    const totalAmount = sale.items.reduce((sum: number, item: any) => sum + item.amount, 0);
+    const finalY = (doc as any).lastAutoTable.finalY || currentY + 10;
+    doc.text(`Total: ${Math.round(totalAmount)} RWF`, contentStartX, finalY + 6);
+    doc.text('Your order is being processed. Thank you!', contentStartX, finalY + 12);
+  
+    const pdfBlob = doc.output('blob');
+  
+    const receiptSummary = `Order ID: ${sale.id}, Date: ${new Date().toLocaleString()}, Total: ${Math.round(
+      totalAmount,
+    )} RWF`;
+  
+    if (sale.saleClient[0]?.email) {
+      const user = {
+        name: sale.saleClient[0].name,
+        email: sale.saleClient[0].email,
+      };
+  
+      const receiptBuffer = await pdfBlob.arrayBuffer();
+      await this.utilsService.sendReceiptToUserAndAdmin(user, receiptSummary, Buffer.from(receiptBuffer));
+    }
+  
     await this.paymentService.initiatePayment(sale.id);
     return sale;
   }
+  
 
   async findAllByProduct(
     productId: string,
@@ -458,7 +562,6 @@ doc.text('Thank you for shopping with us!', contentStartX, finalY + 12);
         },
       },
     };
-
     if (status) where.status = status;
     if (type) where.type = type;
 
