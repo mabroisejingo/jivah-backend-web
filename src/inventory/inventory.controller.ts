@@ -77,12 +77,7 @@ export class InventoryController {
     return this.inventoryService.findOne(id);
   }
 
-  @Get(':id/barcode')
-  @ApiOperation({ summary: 'Get an inventory by barcode' })
-  @ApiResponse({ status: 200, description: 'Return the inventory.' })
-  findOneBarcode(@Param('id') id: string) {
-    return this.inventoryService.findOneBarcode(id);
-  }
+
 
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get paginated inventory for a specific product' })

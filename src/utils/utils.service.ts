@@ -22,10 +22,12 @@ import {
   welcomeEmailTemplate,
 } from 'src/templates/authentication.template';
 import { accountDeactivationEmailTemplate } from 'src/templates/user.template';
+import { adminReceiptEmailTemplate, userReceiptEmailTemplate } from 'src/templates/sale.template';
 
 @Injectable()
 export class UtilsService {
-  private smtpTransport;
+  private infoTransport;
+  private receiptTransport;
   private firebaseApp: admin.app.App;
   constructor(
     private readonly prisma: PrismaService,
@@ -33,14 +35,22 @@ export class UtilsService {
     private jwtService: JwtService,
     private config: ConfigService,
   ) {
-    this.smtpTransport = nodemailer.createTransport({
-      service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 587,
+    this.infoTransport = nodemailer.createTransport({
+      host: this.config.get<string>('SMTP_HOST'), 
+      port: this.config.get<number>('SMTP_PORT'), 
       secure: true,
       auth: {
-        user: this.config.get<string>('SMTP_EMAIL'),
-        pass: this.config.get<string>('SMTP_PASSWORD'),
+        user: this.config.get<string>('INFO_EMAIL'),
+        pass: this.config.get<string>('INFO_PASSWORD'),
+      },
+    });
+    this.receiptTransport = nodemailer.createTransport({
+      host: this.config.get<string>('SMTP_HOST'), 
+      port: this.config.get<number>('SMTP_PORT'), 
+      secure: true,
+      auth: {
+        user: this.config.get<string>('RECEIPT_EMAIL'),
+        pass: this.config.get<string>('RECEIPT_PASSWORD'),
       },
     });
     this.firebaseApp = admin.initializeApp({
@@ -54,28 +64,34 @@ export class UtilsService {
     });
   }
 
-  sendEmail = async (to: string, html: any, subject: string) => {
+  sendEmail = async (
+    to: string,
+    html: string,
+    subject: string,
+    type: 'info' | 'receipt' = 'info',
+    attachments?: { filename: string; content: Buffer | string; contentType?: string }[],
+  ) => {
     try {
-      // if (process.env.NODE_ENV !== 'production') {
-      //   console.log('Not in production environment. Email not sent.');
-      //   return;
-      // }
-
+      const transport = type === 'receipt' ? this.receiptTransport : this.infoTransport;
+  
       const mailOptions = {
-        from: 'info@jivah.com',
+        from: type === 'receipt' ? 'receipt@jivah.com' : 'info@jivah.com',
         to,
         subject,
         html,
+        attachments,
       };
-      await this.smtpTransport.sendMail(mailOptions);
+  
+      await transport.sendMail(mailOptions);
     } catch (e) {
-      console.log(e);
+      console.error(e);
       if (e instanceof HttpException) {
         throw e;
       }
       throw new InternalServerErrorException(e.message);
     }
   };
+  
 
   async verifySocialToken(token: string) {
     return this.firebaseApp.auth().verifyIdToken(token);
@@ -195,6 +211,34 @@ export class UtilsService {
     const subject =
       type == 'password-set' ? 'Reset Password' : 'Activate Your jivah Account';
     await this.sendEmail(user.email, emailHtml, subject);
+  }
+
+
+  async sendReceiptToUserAndAdmin(
+    user: any,
+    receiptSummary: string,
+    receiptBlob: Buffer,
+  ) {
+    const userHtml = userReceiptEmailTemplate(user.name, receiptSummary);
+    const adminHtml = adminReceiptEmailTemplate(user.name, receiptSummary);
+  
+    const attachment = [
+      {
+        filename: 'receipt.pdf',
+        content: receiptBlob,
+        contentType: 'application/pdf',
+      },
+    ];
+  
+    await this.sendEmail(user.email, userHtml, 'Your Jivah Receipt', 'receipt', attachment);
+  
+    await this.sendEmail(
+      'receipt@jivahcollections.com',
+      adminHtml,
+      `Receipt Notification - ${user.name}`,
+      'receipt',
+      attachment,
+    );
   }
 
   async sendDeactivationEmail(user: User) {

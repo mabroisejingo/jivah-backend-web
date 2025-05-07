@@ -19,8 +19,4 @@ export class CreateInventoryDto {
   @Min(0)
   price: number;
 
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  barcode: string;
 }

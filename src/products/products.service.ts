@@ -55,6 +55,7 @@ export class ProductsService {
         size: variantData.size,
         color: variantData.color,
         productId,
+        barcode: variantData.barcode,
       },
       include: {
         Inventory: true,
@@ -707,6 +708,30 @@ export class ProductsService {
       soldQuantity,
     };
   }
+
+    async findOneVariantBarcode(barcode: string) {  
+      const inventory = await this.prisma.productVariant.findFirst({
+        where: { barcode, deleted: false },
+        include: {
+          product:{
+            include: {
+              category: true,
+              images:true
+            },
+          },
+          Inventory:{
+            include: {
+              SaleItem: true,
+              discounts: true,
+            },
+          }
+        },
+      });
+      if (!inventory) {
+        throw new NotFoundException(`No Variant found related to the barcode`);
+      }
+      return inventory;
+    }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
     const { images, ...productData } = updateProductDto;

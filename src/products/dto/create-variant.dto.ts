@@ -12,4 +12,8 @@ export class CreateVariantDto {
   @IsString()
   @IsNotEmpty()
   image: string;
+
+  @IsString()
+  @IsNotEmpty()
+  barcode: string;
 }

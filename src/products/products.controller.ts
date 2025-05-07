@@ -132,6 +132,14 @@ export class ProductsController {
     return this.productsService.getRelatedProducts(id,req);
   }
 
+
+  @Get(':id/barcode')
+  @ApiOperation({ summary: 'Get an variant by barcode' })
+  @ApiResponse({ status: 200, description: 'Return the variant.' })
+  findOneBarcode(@Param('id') id: string) {
+    return this.productsService.findOneVariantBarcode(id);
+  }
+
   @Get(':id/id')
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
