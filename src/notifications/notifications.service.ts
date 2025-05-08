@@ -67,6 +67,8 @@ export class NotificationsService {
     const notifications = [];
     const deviceTokens: string[] = [];
 
+    console.log(userIds);
+
     // Create notifications in the database and collect device tokens
     for (const userId of userIds) {
       const notification = await this.prisma.notification.create({

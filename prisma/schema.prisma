@@ -259,6 +259,7 @@ model Sale {
   cancelReason   String?
   refundReason   String?
   refundResponse String?
+  transactionRef String?
 }
 
 enum SaleType {

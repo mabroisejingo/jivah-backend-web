@@ -13,7 +13,6 @@ export class PaymentsController {
 
   @Post('callback')
   async handlePaymentCallback(@Body() requestBody: any) {
-    console.log(requestBody);
     await this.paymentsService.handlePaymentCallback(requestBody);
   }
 }
