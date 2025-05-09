@@ -3,30 +3,78 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SaleStatus } from '@prisma/client';
+import { NotificationType, SaleStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import fetch from 'node-fetch';
+import PaypackJs from "paypack-js";
+import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
   private accessToken: string;
+  private paypack: any;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService,private config: ConfigService,private notificationService:NotificationsService) {
+    this.paypack = new PaypackJs({
+      client_id: this.config.get<string>("PAYPACK_CLIENT_ID"),
+      client_secret: this.config.get<string>("PAYPACK_CLIENT_SECRET"),
+    });
+  }
 
   async initiatePayment(saleId: string): Promise<string> {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
-      include: { items: true, saleClient: true },
+      include: {
+        saleClient:true,
+        items: {
+          include: {
+            inventory: {
+              include: {
+                discounts: true,
+              },
+            },
+          },
+        },
+      },
     });
-
+  
     if (!sale) {
       throw new NotFoundException('Sale not found');
     }
-
-    await this.generateAccessToken();
+  
+    const saleDate = sale.createdAt;
+  
+    let totalAmount = 0;
+  
+    for (const item of sale.items) {
+      const { quantity, inventory } = item;
+      const { price, discounts } = inventory;
+      const validDiscounts = discounts.filter((discount) => {
+        const inDateRange =
+          saleDate >= discount.startDate &&
+          saleDate <= discount.endDate;
+  
+        const inHourRange =
+          discount.startHour == null ||
+          discount.endHour == null ||
+          (saleDate.getHours() >= discount.startHour &&
+           saleDate.getHours() <= discount.endHour);
+  
+        return inDateRange && inHourRange;
+      });
+      const highestDiscount = validDiscounts.reduce((max, d) =>
+        d.percentage > max ? d.percentage : max, 0);
+  
+      const discountedPrice = price * (1 - highestDiscount / 100);
+      const itemTotal = discountedPrice * quantity;
+  
+      totalAmount += itemTotal;
+    }
+  
     const rawPaymentInfo = sale.saleClient[0].paymentInfo || '{}';
     let paymentInfo;
-
+  
     try {
       paymentInfo =
         typeof rawPaymentInfo === 'string'
@@ -35,82 +83,114 @@ export class PaymentsService {
     } catch (error) {
       throw new BadRequestException('Invalid payment info format');
     }
-
+  
     if (!paymentInfo.accountNumber) {
       throw new BadRequestException('Please provide the payment info');
     }
-
-    const paymentData = {
-      accountNumber: paymentInfo.accountNumber,
-      amount: '5000',
-      currency: 'TZS',
-      externalId: saleId,
-      provider: 'Airtel',
-    };
-
-    const headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.accessToken}`,
-    };
-
-    const paymentResponse = await fetch(
-      'https://sandbox.azampay.co.tz/azampay/mno/checkout',
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(paymentData),
-      },
-    );
-
-    const paymentJson:any = await paymentResponse.json();
-
-    console.log(paymentJson);
-
-    if (paymentJson?.success) {
+  
+    try {
+      const paypackPayload = {
+        number: paymentInfo.accountNumber,
+        // number: "+250798667792",
+        // number: "+250793748136",
+        amount: totalAmount,
+        environment: 'development', 
+      };
+  
+      const paypackResponse: { data: {
+        amount: number;
+        created_at: string;
+        kind: string;
+        ref: string;
+        status: string;
+      } } =
+        await this.paypack.cashin(paypackPayload);
+  
       await this.prisma.sale.update({
-        where: { id: saleId },
+        where: { id: saleId, },
         data: {
           status: SaleStatus.PAYMENT_PENDING,
-          saleClient: {
-            update: {
-              where: { id: sale.saleClient[0].id },
-              data: {
-                paymentInfo: JSON.stringify({
-                  ...paymentInfo,
-                  paymentId: paymentJson.transactionId,
-                }),
-              },
-            },
-          },
+          transactionRef:paypackResponse.data.ref
         },
       });
-    } else {
-      throw new BadRequestException(paymentJson.message);
+  
+      return paypackResponse.data.ref;
+    } catch (error) {
+      console.error(`Payment failed: ${error.message}`);
+      throw new BadRequestException('Payment processing failed');
+    }
+  }
+  
+  async handlePaymentCallback(requestBody: any): Promise<void> {
+    const transactionRef = requestBody.data.ref;
+    const transactionStatus = requestBody.data.status;
+  
+    const sale = await this.prisma.sale.findFirst({
+      where: {
+        transactionRef: transactionRef,
+      },
+      include: {
+        saleClient:true
+      },
+    });
+  
+    if (!sale) {
+      throw new BadRequestException('Associated sale not found');
     }
 
-    return paymentJson?.transactionId ?? 'Unknown';
-  }
-
-  async handlePaymentCallback(requestBody: any): Promise<void> {
-    const saleId = requestBody.utilityref;
-
-    if (requestBody.transactionstatus != 'success') return;
-
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-    });
-
-    if (!sale) {
-      throw new BadRequestException('Sale not found');
+    const user = await this.prisma.user.findFirst({
+      where:{
+        email:sale.saleClient[0].email
+      }
+    })
+  
+    if(user){
+      const formattedDate = new Date(sale.createdAt).toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    
+      if (transactionStatus !== 'success' && user) {
+        const plainMessage = `Your payment for the order you made on Jivah Collections on ${formattedDate} was not successful. Please check your payment method and try again or contact our support team for assistance.`;
+        const htmlMessage = `<p>Your payment for the order you made on <strong>Jivah Collections</strong> on <strong>${formattedDate}</strong> was <span style="color: red;">not successful</span>.</p><p>Please check your payment method and try again or contact our support team for assistance.</p>`;
+    
+        await this.notificationService.createNotification(
+          [user.id],
+          'Payment Failed',
+          plainMessage,
+          htmlMessage,
+          NotificationType.ERROR,
+        );
+        return;
+      }
+    
+  
+    
+      const plainMessage = `Your payment for the order you placed on Jivah Collections on ${formattedDate} was successful. We are now processing your order. Thank you for shopping with us!`;
+      const htmlMessage = `<p>Your payment for the order you placed on <strong>Jivah Collections</strong> on <strong>${formattedDate}</strong> was <span style="color: green;">successful</span>.</p><p>We are now processing your order. Thank you for shopping with us!</p>`;
+    
+      await this.notificationService.createNotification(
+        [user.id],
+        'Payment Successful',
+        plainMessage,
+        htmlMessage,
+        NotificationType.SUCCESS,
+      );
     }
 
     await this.prisma.sale.update({
-      where: { id: saleId },
+      where: { id: sale.id },
       data: {
-        status: SaleStatus.PENDING,
+        status: SaleStatus.COMPLETED,
       },
     });
   }
+  
 
   private async generateAccessToken(): Promise<void> {
     const data = {
