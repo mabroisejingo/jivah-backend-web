@@ -94,7 +94,7 @@ export class PaymentsService {
         // number: "+250798667792",
         // number: "+250793748136",
         amount: totalAmount,
-        environment: 'development', 
+        environment: 'production', 
       };
   
       const paypackResponse: { data: {
