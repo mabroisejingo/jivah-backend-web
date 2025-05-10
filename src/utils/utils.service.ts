@@ -75,7 +75,9 @@ export class UtilsService {
       const transport = type === 'receipt' ? this.receiptTransport : this.infoTransport;
   
       const mailOptions = {
-        from: type === 'receipt' ? 'receipt@jivah.com' : 'info@jivah.com',
+        from: type === 'receipt' 
+          ? '"Jivah Collections" <receipt@jivahcollections.com>' 
+          : '"Jivah Collections" <info@jivahcollections.com>',
         to,
         subject,
         html,
