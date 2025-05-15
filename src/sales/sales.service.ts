@@ -45,9 +45,14 @@ export class SalesService {
       const remainingStock = inventory.quantity - totalSold;
   
       if (remainingStock < item.quantity) {
+        const productName = inventory.variant.product.name;
+        const size = inventory.variant.size;
+        const color = inventory.variant.color;
+      
         throw new BadRequestException(
-          `Oops! Only ${remainingStock} item(s) of "${inventory.variant.product.name}" are currently available.`,
+          `Sorry, only ${remainingStock} item(s) left for "${productName}" (Size: ${size}, Color: ${color}). Please adjust your quantity.`
         );
+      
       }
     }
   
@@ -189,7 +194,7 @@ export class SalesService {
       createOrderDto.items.map(async (item) => {
         const inventory = await this.prisma.inventory.findUnique({
           where: { id: item.inventoryId },
-          include: { SaleItem: true },
+          include: { SaleItem: true,variant:{include:{product:true}} },
         });
   
         if (!inventory) {
@@ -203,9 +208,14 @@ export class SalesService {
         const remainingStock = inventory.quantity - totalSold;
   
         if (remainingStock < item.quantity) {
+          const productName = inventory.variant.product.name;
+          const size = inventory.variant.size;
+          const color = inventory.variant.color;
+        
           throw new BadRequestException(
-            `Not enough stock for inventory ${item.inventoryId}. Only ${remainingStock} remaining.`,
+            `Sorry, only ${remainingStock} item(s) left for "${productName}" (Size: ${size}, Color: ${color}). Please adjust your quantity.`
           );
+        
         }
   
         return inventory;

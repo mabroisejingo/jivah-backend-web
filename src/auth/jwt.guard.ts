@@ -39,13 +39,24 @@ export class JwtGuard implements CanActivate {
         where: { id: decoded.id },
         include: { role: true },
       });
+    
       if (!user) {
         throw new UnauthorizedException('Unauthorized.');
       }
+    
       req.user = user;
       return true;
     } catch (error) {
       console.error('Token verification or user retrieval error:', error);
+    
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Expired token.');
+      }
+    
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Unauthorized.');
+      }
+    
       throw new InternalServerErrorException('Error while verifying token.');
     }
   }
