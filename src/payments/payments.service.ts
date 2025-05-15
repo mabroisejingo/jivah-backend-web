@@ -6,19 +6,20 @@ import {
 import { NotificationType, SaleStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import fetch from 'node-fetch';
-import PaypackJs from "paypack-js";
+import PaypackJs, { Paypack } from "paypack-js";
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
   private accessToken: string;
-  private paypack: any;
+  private paypack: Paypack;
 
   constructor(private prisma: PrismaService,private config: ConfigService,private notificationService:NotificationsService) {
     this.paypack = new PaypackJs({
       client_id: this.config.get<string>("PAYPACK_CLIENT_ID"),
       client_secret: this.config.get<string>("PAYPACK_CLIENT_SECRET"),
+      
     });
   }
 
